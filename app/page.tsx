@@ -14,7 +14,7 @@ export default function HomePage() {
       <Benefits />
       <ProductShowcase />
       <CtaBand />
-      <OrderSection />
+  <OrderSection />
       <SiteFooter />
     </main>
   );

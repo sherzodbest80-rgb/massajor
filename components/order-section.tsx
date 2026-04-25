@@ -1,4 +1,62 @@
+"use client";
+
+import { useState } from "react";
+
 export function OrderSection() {
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    comment: "",
+  });
+
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    setStatus("loading");
+    setErrorMsg("");
+
+    try {
+      const res = await fetch("/api/lead", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...form,
+          fbp: getCookie("_fbp"),
+          fbc: getCookie("_fbc"),
+          userAgent: navigator.userAgent,
+          pageUrl: window.location.href,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Xatolik yuz berdi");
+      }
+
+      setStatus("success");
+      setForm({
+        name: "",
+        phone: "",
+        comment: "",
+      });
+    } catch (err: any) {
+      setStatus("error");
+      setErrorMsg(err.message);
+    }
+  };
+
   return (
     <section id="order" className="section-space bg-canvas">
       <div className="container-shell">
@@ -17,22 +75,60 @@ export function OrderSection() {
           </div>
 
           <div className="p-8 sm:p-10 lg:p-12">
-            <form className="grid gap-4">
+            <form onSubmit={handleSubmit} className="grid gap-4">
               <label className="grid gap-2">
                 <span className="text-sm font-bold text-ink">Ismingiz</span>
-                <input className="h-14 rounded-2xl border border-black/10 px-4 outline-none ring-0 transition focus:border-brand" placeholder="Ismingizni kiriting" />
-              </label>
-              <label className="grid gap-2">
-                <span className="text-sm font-bold text-ink">Telefon raqami</span>
-                <input className="h-14 rounded-2xl border border-black/10 px-4 outline-none ring-0 transition focus:border-brand" placeholder="+998 90 123 45 67" />
-              </label>
-              <label className="grid gap-2">
-                <span className="text-sm font-bold text-ink">Izoh</span>
-                <textarea className="min-h-[140px] rounded-2xl border border-black/10 px-4 py-4 outline-none transition focus:border-brand" placeholder="Yetkazib berish yoki mahsulot bo‘yicha izoh" />
+                <input
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  className="h-14 rounded-2xl border border-black/10 px-4 outline-none ring-0 transition focus:border-brand"
+                  placeholder="Ismingizni kiriting"
+                  required
+                />
               </label>
 
-              <button type="submit" className="pill-btn mt-2 bg-brand text-white shadow-cta">
-                Buyurtma yuborish
+              <label className="grid gap-2">
+                <span className="text-sm font-bold text-ink">Telefon raqami</span>
+                <input
+                  name="phone"
+                  value={form.phone}
+                  onChange={handleChange}
+                  className="h-14 rounded-2xl border border-black/10 px-4 outline-none ring-0 transition focus:border-brand"
+                  placeholder="+998 90 123 45 67"
+                  required
+                />
+              </label>
+
+              <label className="grid gap-2">
+                <span className="text-sm font-bold text-ink">Izoh</span>
+                <textarea
+                  name="comment"
+                  value={form.comment}
+                  onChange={handleChange}
+                  className="min-h-[140px] rounded-2xl border border-black/10 px-4 py-4 outline-none transition focus:border-brand"
+                  placeholder="Yetkazib berish yoki mahsulot bo‘yicha izoh"
+                />
+              </label>
+
+              {status === "error" && (
+                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600">
+                  {errorMsg}
+                </div>
+              )}
+
+              {status === "success" && (
+                <div className="rounded-2xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-700">
+                  Arizangiz qabul qilindi. Tez orada siz bilan bog‘lanamiz.
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="pill-btn mt-2 bg-brand text-white shadow-cta"
+                disabled={status === "loading"}
+              >
+                {status === "loading" ? "Yuborilmoqda..." : "Buyurtma yuborish"}
               </button>
             </form>
           </div>
@@ -40,4 +136,14 @@ export function OrderSection() {
       </div>
     </section>
   );
+}
+
+function getCookie(name: string): string {
+  if (typeof document === "undefined") return "";
+
+  const match = document.cookie.match(
+    new RegExp("(^| )" + name + "=([^;]+)")
+  );
+
+  return match ? match[2] : "";
 }
