@@ -4,17 +4,37 @@ import crypto from "crypto";
 interface LeadPayload {
   name: string;
   phone: string;
-  address: string;
+  address?: string;
+  viloyat?: string;
+  comment?: string;
   fbp?: string;
   fbc?: string;
   userAgent?: string;
   pageUrl?: string;
 }
 
+// Viloyat nomi → amoCRM enum_id mapping (custom field 316123)
+const VILOYAT_ENUM_IDS: Record<string, number> = {
+  "Toshkent": 622167,
+  "Andijon": 622169,
+  "Farg'ona": 622171,
+  "Sirdaryo": 622173,
+  "Jizzax": 622175,
+  "Samarqand": 622177,
+  "Qashqadaryo": 622179,
+  "Surxondaryo": 622181,
+  "Buxoro": 622183,
+  "Xorazm": 622185,
+  "Qoraqalpog'iston": 622187,
+  "Namangan": 165431,
+};
+
+const VILOYAT_FIELD_ID = 316123; // "Viloyat" custom field ID (lead'da)
+
 export async function POST(req: NextRequest) {
   try {
     const body: LeadPayload = await req.json();
-    const { name, phone, address, fbp, fbc, userAgent, pageUrl } = body;
+    const { name, phone, address, viloyat, comment, fbp, fbc, userAgent, pageUrl } = body;
 
     if (!name || !phone) {
       return NextResponse.json({ error: "Ism va telefon majburiy" }, { status: 400 });
@@ -32,7 +52,15 @@ export async function POST(req: NextRequest) {
       pageUrl: pageUrl || process.env.NEXT_PUBLIC_SITE_URL || "",
     });
 
-    const amoResult = await createAmoCRMLead({ name, phone, address, fbp, fbc });
+    const amoResult = await createAmoCRMLead({
+      name,
+      phone,
+      address: address || viloyat || "",
+      viloyat: viloyat || "",
+      comment: comment || "",
+      fbp,
+      fbc,
+    });
 
     return NextResponse.json({ success: true, meta: metaResult, amo: amoResult });
   } catch (err: any) {
@@ -100,6 +128,8 @@ async function createAmoCRMLead(data: {
   name: string;
   phone: string;
   address: string;
+  viloyat: string;
+  comment: string;
   fbp?: string;
   fbc?: string;
 }) {
@@ -107,6 +137,9 @@ async function createAmoCRMLead(data: {
   const ACCESS_TOKEN = process.env.AMOCRM_ACCESS_TOKEN;
   const FIELD_FBP = process.env.AMOCRM_FIELD_FBP;
   const FIELD_FBC = process.env.AMOCRM_FIELD_FBC;
+  const PIPELINE_ID = process.env.AMOCRM_PIPELINE_ID
+    ? parseInt(process.env.AMOCRM_PIPELINE_ID)
+    : null;
 
   if (!DOMAIN || !ACCESS_TOKEN) {
     console.warn("[AMOCRM] .env da AMOCRM_DOMAIN yoki AMOCRM_ACCESS_TOKEN yo'q, o'tkazib yuborildi");
@@ -119,125 +152,101 @@ async function createAmoCRMLead(data: {
     Authorization: `Bearer ${ACCESS_TOKEN}`,
   };
 
-  let contactId: number | null = null;
+  // Kontakt custom fields — FAQAT TELEFON
+  const contactCustomFields: any[] = [
+    {
+      field_code: "PHONE",
+      values: [{ value: data.phone, enum_code: "WORK" }],
+    },
+  ];
 
-  try {
-    const searchRes = await fetch(
-      `${baseUrl}/api/v4/contacts?query=${encodeURIComponent(data.phone)}`,
-      { headers }
-    );
-    if (searchRes.ok) {
-      const searchData = await searchRes.json();
-      const existing = searchData?._embedded?.contacts?.[0];
-      if (existing) {
-        contactId = existing.id;
-        console.log("[AMOCRM] Mavjud kontakt topildi:", contactId);
+  // Lid custom fields — Viloyat + FBP + FBC
+  const leadCustomFields: any[] = [];
 
-        // Mavjud kontaktga FBP/FBC ni yangilash
-        if (FIELD_FBP || FIELD_FBC) {
-          const updateFields: any[] = [];
-          if (FIELD_FBP && data.fbp) {
-            updateFields.push({
-              field_id: parseInt(FIELD_FBP),
-              values: [{ value: data.fbp }],
-            });
-          }
-          if (FIELD_FBC && data.fbc) {
-            updateFields.push({
-              field_id: parseInt(FIELD_FBC),
-              values: [{ value: data.fbc }],
-            });
-          }
-
-          if (updateFields.length > 0) {
-            await fetch(`${baseUrl}/api/v4/contacts/${contactId}`, {
-              method: "PATCH",
-              headers,
-              body: JSON.stringify({ custom_fields_values: updateFields }),
-            });
-            console.log("[AMOCRM] FBP/FBC yangilandi");
-          }
-        }
-      }
-    }
-  } catch (err) {
-    console.warn("[AMOCRM] Kontakt qidirishda xatolik:", err);
-  }
-
-  if (!contactId) {
-    const customFields: any[] = [
-      {
-        field_code: "PHONE",
-        values: [{ value: data.phone, enum_code: "WORK" }],
-      },
-    ];
-
-    // FBP qo'shish
-    if (FIELD_FBP && data.fbp) {
-      customFields.push({
-        field_id: parseInt(FIELD_FBP),
-        values: [{ value: data.fbp }],
-      });
-    }
-
-    // FBC qo'shish
-    if (FIELD_FBC && data.fbc) {
-      customFields.push({
-        field_id: parseInt(FIELD_FBC),
-        values: [{ value: data.fbc }],
-      });
-    }
-
-    const contactPayload = [{
-      name: data.name,
-      custom_fields_values: customFields,
-    }];
-
-    const contactRes = await fetch(`${baseUrl}/api/v4/contacts`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(contactPayload),
+  // Viloyat
+  if (data.viloyat && VILOYAT_ENUM_IDS[data.viloyat]) {
+    leadCustomFields.push({
+      field_id: VILOYAT_FIELD_ID,
+      values: [{ enum_id: VILOYAT_ENUM_IDS[data.viloyat] }],
     });
-
-    const contactData = await contactRes.json();
-    if (!contactRes.ok) {
-      console.error("[AMOCRM KONTAKT XATOLIK]", JSON.stringify(contactData, null, 2));
-    } else {
-      contactId = contactData?._embedded?.contacts?.[0]?.id;
-      console.log("[AMOCRM] Yangi kontakt yaratildi (FBP/FBC bilan):", contactId);
-    }
   }
 
-  const leadPayload: any[] = [{
-    name: `${data.name} - ${data.phone}`,
-    ...(process.env.AMOCRM_PIPELINE_ID ? { pipeline_id: parseInt(process.env.AMOCRM_PIPELINE_ID) } : {}),
-    ...(process.env.AMOCRM_STATUS_ID ? { status_id: parseInt(process.env.AMOCRM_STATUS_ID) } : {}),
-    ...(contactId ? { _embedded: { contacts: [{ id: contactId }] } } : {}),
+  // FBP
+  if (FIELD_FBP && data.fbp) {
+    leadCustomFields.push({
+      field_id: parseInt(FIELD_FBP),
+      values: [{ value: data.fbp }],
+    });
+  }
+
+  // FBC
+  if (FIELD_FBC && data.fbc) {
+    leadCustomFields.push({
+      field_id: parseInt(FIELD_FBC),
+      values: [{ value: data.fbc }],
+    });
+  }
+
+  // "Неразобранное" ga lid tushirish
+  const unsortedPayload = [{
+    source_name: "Website",
+    source_uid: `web_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    ...(PIPELINE_ID ? { pipeline_id: PIPELINE_ID } : {}),
+    metadata: {
+      form_id: "website_form",
+      form_name: "Website Lead Form",
+      form_page: process.env.NEXT_PUBLIC_SITE_URL || "https://massajor.uz",
+      ip: "127.0.0.1",
+      form_sent_at: Math.floor(Date.now() / 1000),
+      referer: process.env.NEXT_PUBLIC_SITE_URL || "https://massajor.uz",
+    },
+    _embedded: {
+      leads: [{
+        name: `${data.name} - ${data.phone}`,
+        ...(PIPELINE_ID ? { pipeline_id: PIPELINE_ID } : {}),
+        ...(leadCustomFields.length > 0 ? { custom_fields_values: leadCustomFields } : {}),
+      }],
+      contacts: [{
+        name: data.name,
+        custom_fields_values: contactCustomFields,
+      }],
+    },
   }];
 
-  const leadRes = await fetch(`${baseUrl}/api/v4/leads`, {
+  const unsortedRes = await fetch(`${baseUrl}/api/v4/leads/unsorted/forms`, {
     method: "POST",
     headers,
-    body: JSON.stringify(leadPayload),
+    body: JSON.stringify(unsortedPayload),
   });
 
-  const leadData = await leadRes.json();
-  if (!leadRes.ok) {
-    console.error("[AMOCRM LID XATOLIK]", JSON.stringify(leadData, null, 2));
-    throw new Error("AmoCRM lid yaratishda xatolik");
+  const unsortedData = await unsortedRes.json();
+  if (!unsortedRes.ok) {
+    console.error("[AMOCRM UNSORTED XATOLIK]", JSON.stringify(unsortedData, null, 2));
+    throw new Error("AmoCRM Неразобранное ga lid yaratishda xatolik");
   }
 
-  const leadId = leadData?._embedded?.leads?.[0]?.id;
-  console.log("[AMOCRM] Lid yaratildi ID:", leadId);
+  const unsortedItem = unsortedData?._embedded?.unsorted?.[0];
+  const leadId = unsortedItem?._embedded?.leads?.[0]?.id;
+  const contactId = unsortedItem?._embedded?.contacts?.[0]?.id;
 
-  if (leadId && data.address) {
+  console.log("[AMOCRM] Неразобранное'ga lid tushdi! ID:", leadId, "Viloyat:", data.viloyat);
+
+  // Izoh: viloyat + telefon + comment
+  if (leadId) {
     try {
+      const noteText = [
+        `Mijoz: ${data.name}`,
+        `Telefon: ${data.phone}`,
+        data.viloyat ? `Viloyat: ${data.viloyat}` : "",
+        data.comment ? `Izoh: ${data.comment}` : "",
+      ].filter(Boolean).join("\n");
+
       await fetch(`${baseUrl}/api/v4/leads/${leadId}/notes`, {
         method: "POST",
         headers,
         body: JSON.stringify([{
           note_type: "common",
-          params: { text: `Manzil: ${data.address}\nTelefon: ${data.phone}\nMijoz: ${data.name}` },
+          params: { text: noteText },
         }]),
       });
       console.log("[AMOCRM] Izoh qo'shildi");
