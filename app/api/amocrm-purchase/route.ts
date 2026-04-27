@@ -4,6 +4,8 @@ import crypto from "crypto";
 /**
  * AmoCRM webhook endpoint
  * SOTILDI bosqichiga lid o'tganda Meta'ga Purchase event yuboradi
+ * 
+ * MUHIM: Summa 0 yoki bo'sh bo'lsa — Meta'ga Purchase YUBORILMAYDI!
  */
 
 export async function POST(req: NextRequest) {
@@ -42,13 +44,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    // ⚠️ SUMMA TEKSHIRUVI — eng muhim qism!
+    const finalPrice = parseFloat(price) || leadInfo.price || 0;
+
+    if (!finalPrice || finalPrice <= 0) {
+      console.warn(`[AMO PURCHASE] ❌ Summa 0 yoki yo'q (${finalPrice}) — Meta'ga YUBORILMADI!`);
+      console.warn(`[AMO PURCHASE] Lid ID: ${leadId} - operator summani kiritishini kuting`);
+      return NextResponse.json({ 
+        ok: true, 
+        skipped: true, 
+        reason: "Summa kiritilmagan",
+      });
+    }
+
+    console.log(`[AMO PURCHASE] ✅ Summa: ${finalPrice} so'm — Meta'ga yuborilyapti...`);
+
     // Meta'ga Purchase event yuborish
     const result = await sendPurchaseToMeta({
       phone: leadInfo.phone,
       name: leadInfo.name,
       fbp: leadInfo.fbp,
       fbc: leadInfo.fbc,
-      price: parseFloat(price) || leadInfo.price || 0,
+      price: finalPrice,
     });
 
     return NextResponse.json({ ok: true, meta: result });
@@ -146,7 +163,7 @@ async function sendPurchaseToMeta(data: {
     data: [{
       event_name: "Purchase",
       event_time: Math.floor(Date.now() / 1000),
-      event_source_url: process.env.NEXT_PUBLIC_SITE_URL || "https://powergym.uz",
+      event_source_url: process.env.NEXT_PUBLIC_SITE_URL || "https://massajor.uz",
       action_source: "website",
       user_data: {
         ph: normalizedPhone ? [hash(normalizedPhone)] : [],
@@ -174,6 +191,6 @@ async function sendPurchaseToMeta(data: {
     return { error: result };
   }
 
-  console.log("[META PURCHASE] Event yuborildi! Summa:", data.price);
+  console.log(`[META PURCHASE] ✅ Event yuborildi! Summa: ${data.price} UZS`);
   return result;
 }
