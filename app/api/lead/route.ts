@@ -29,7 +29,24 @@ const VILOYAT_ENUM_IDS: Record<string, number> = {
   "Namangan": 165431,
 };
 
-const VILOYAT_FIELD_ID = 316123; // "Viloyat" custom field ID (lead'da)
+// Viloyat nomi → Meta uchun shahar slug (lowercase, no spaces)
+const VILOYAT_TO_CITY: Record<string, string> = {
+  "Toshkent": "tashkent",
+  "Andijon": "andijan",
+  "Farg'ona": "fergana",
+  "Sirdaryo": "sirdaryo",
+  "Jizzax": "jizzakh",
+  "Samarqand": "samarkand",
+  "Qashqadaryo": "qashqadaryo",
+  "Surxondaryo": "surxondaryo",
+  "Buxoro": "bukhara",
+  "Xorazm": "khorezm",
+  "Qoraqalpog'iston": "karakalpakstan",
+  "Namangan": "namangan",
+  "Navoiy": "navoi",
+};
+
+const VILOYAT_FIELD_ID = 316123;
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,23 +62,55 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ||
       "127.0.0.1";
 
-    const metaResult = await sendToMetaCAPI({
-      name, phone, fbp, fbc,
-      clientIp,
-      userAgent: userAgent || "",
-      pageUrl: pageUrl || process.env.NEXT_PUBLIC_SITE_URL || "",
-    });
+    // 1-QADAM: AmoCRM'ga yuborish (try/catch bilan o'ralgan)
+    // Agar AmoCRM xato bersa, Meta'ga baribir event yuboramiz
+    let amoResult: any = null;
+    try {
+      amoResult = await createAmoCRMLead({
+        name,
+        phone,
+        address: address || viloyat || "",
+        viloyat: viloyat || "",
+        comment: comment || "",
+        fbp,
+        fbc,
+        clientIp,
+        userAgent: userAgent || "",
+      });
+    } catch (amoErr: any) {
+      console.error("[AMOCRM XATO] Lid yaratilmadi, lekin Meta'ga baribir yuboramiz:", amoErr.message);
+      amoResult = { error: amoErr.message };
+    }
 
-    const amoResult = await createAmoCRMLead({
-      name,
-      phone,
-      address: address || viloyat || "",
-      viloyat: viloyat || "",
-      comment: comment || "",
-      fbp,
-      fbc,
-    });
+    // 2-QADAM: Meta'ga yuborish (har doim ishlaydi)
+    let metaResult: any = null;
+    try {
+      metaResult = await sendToMetaCAPI({
+        name,
+        phone,
+        viloyat: viloyat || "",
+        fbp,
+        fbc,
+        clientIp,
+        userAgent: userAgent || "",
+        pageUrl: pageUrl || process.env.NEXT_PUBLIC_SITE_URL || "",
+        contactId: amoResult?.contactId ? String(amoResult.contactId) : "",
+        leadId: amoResult?.leadId ? String(amoResult.leadId) : "",
+      });
+    } catch (metaErr: any) {
+      console.error("[META XATO]", metaErr.message);
+      metaResult = { error: metaErr.message };
+    }
 
+    // Agar AmoCRM ham, Meta ham xato bergan bo'lsa — foydalanuvchiga xato qaytaramiz
+    if (amoResult?.error && metaResult?.error) {
+      return NextResponse.json(
+        { error: "Xizmat vaqtincha ishlamayapti, iltimos qayta urining" },
+        { status: 500 }
+      );
+    }
+
+    // Hech bo'lmaganda biri ishlasa — muvaffaqiyat
     return NextResponse.json({ success: true, meta: metaResult, amo: amoResult });
   } catch (err: any) {
     console.error("[LEAD API ERROR]", err);
@@ -72,47 +121,77 @@ export async function POST(req: NextRequest) {
 async function sendToMetaCAPI(data: {
   name: string;
   phone: string;
+  viloyat: string;
   fbp?: string;
   fbc?: string;
   clientIp: string;
   userAgent: string;
   pageUrl: string;
+  contactId: string;
+  leadId: string;
 }) {
   const PIXEL_ID = process.env.META_PIXEL_ID;
   const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
 
   if (!PIXEL_ID || !ACCESS_TOKEN) {
-    console.warn("[META CAPI] .env da META_PIXEL_ID yoki META_ACCESS_TOKEN yo'q, o'tkazib yuborildi");
+    console.warn("[META CAPI] credentials yo'q, o'tkazib yuborildi");
     return { skipped: true };
   }
 
   const hash = (value: string) =>
     crypto.createHash("sha256").update(value.toLowerCase().trim()).digest("hex");
 
-  const normalizedPhone = data.phone.replace(/[\s\-\(\)]/g, "");
+  const normalizedPhone = data.phone.replace(/[\s\-\(\)\+]/g, "");
+
+  // Ism va familiyani ajratish
+  const nameParts = data.name.trim().split(/\s+/);
+  const firstName = nameParts[0] || "";
+  const lastName = nameParts.slice(1).join(" ");
+
+  // user_data ni dinamik qurish — bo'sh qiymatlarni QO'SHMAYMIZ
+  const userData: Record<string, any> = {
+    ph: [hash(normalizedPhone)],
+    client_ip_address: data.clientIp,
+    client_user_agent: data.userAgent,
+    country: [hash("uz")],
+  };
+
+  if (firstName) userData.fn = [hash(firstName)];
+  if (lastName) userData.ln = [hash(lastName)];
+
+  const city = VILOYAT_TO_CITY[data.viloyat];
+  if (city) userData.ct = [hash(city)];
+
+  if (data.contactId) {
+    userData.external_id = [hash(data.contactId)];
+  }
+
+  if (data.fbp) userData.fbp = data.fbp;
+  if (data.fbc) userData.fbc = data.fbc;
 
   const payload = {
     data: [{
       event_name: "Lead",
       event_time: Math.floor(Date.now() / 1000),
+      event_id: data.leadId ? `lead_${data.leadId}` : `lead_${Date.now()}`,
       event_source_url: data.pageUrl,
       action_source: "website",
-      user_data: {
-        fn: [hash(data.name.split(" ")[0] || data.name)],
-        ln: [hash(data.name.split(" ")[1] || "")],
-        ph: [hash(normalizedPhone)],
-        client_ip_address: data.clientIp,
-        client_user_agent: data.userAgent,
-        fbp: data.fbp || "",
-        fbc: data.fbc || "",
-      },
+      user_data: userData,
     }],
-    ...(process.env.META_TEST_EVENT_CODE ? { test_event_code: process.env.META_TEST_EVENT_CODE } : {}),
+    ...(process.env.META_TEST_EVENT_CODE
+      ? { test_event_code: process.env.META_TEST_EVENT_CODE }
+      : {}),
   };
+
+  console.log("[META CAPI] user_data keys:", Object.keys(userData));
 
   const res = await fetch(
     `https://graph.facebook.com/v19.0/${PIXEL_ID}/events?access_token=${ACCESS_TOKEN}`,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
   );
 
   const result = await res.json();
@@ -120,7 +199,8 @@ async function sendToMetaCAPI(data: {
     console.error("[META CAPI ERROR]", result);
     return { error: result };
   }
-  console.log("[META CAPI] Event yuborildi");
+
+  console.log("[META CAPI] ✅ Lead event yuborildi");
   return result;
 }
 
@@ -132,17 +212,21 @@ async function createAmoCRMLead(data: {
   comment: string;
   fbp?: string;
   fbc?: string;
+  clientIp?: string;
+  userAgent?: string;
 }) {
   const DOMAIN = process.env.AMOCRM_DOMAIN;
   const ACCESS_TOKEN = process.env.AMOCRM_ACCESS_TOKEN;
   const FIELD_FBP = process.env.AMOCRM_FIELD_FBP;
   const FIELD_FBC = process.env.AMOCRM_FIELD_FBC;
+  const FIELD_IP = process.env.AMOCRM_FIELD_IP;
+  const FIELD_USER_AGENT = process.env.AMOCRM_FIELD_USER_AGENT;
   const PIPELINE_ID = process.env.AMOCRM_PIPELINE_ID
     ? parseInt(process.env.AMOCRM_PIPELINE_ID)
     : null;
 
   if (!DOMAIN || !ACCESS_TOKEN) {
-    console.warn("[AMOCRM] .env da AMOCRM_DOMAIN yoki AMOCRM_ACCESS_TOKEN yo'q, o'tkazib yuborildi");
+    console.warn("[AMOCRM] credentials yo'q, o'tkazib yuborildi");
     return { skipped: true };
   }
 
@@ -152,7 +236,6 @@ async function createAmoCRMLead(data: {
     Authorization: `Bearer ${ACCESS_TOKEN}`,
   };
 
-  // Kontakt custom fields — FAQAT TELEFON
   const contactCustomFields: any[] = [
     {
       field_code: "PHONE",
@@ -160,10 +243,8 @@ async function createAmoCRMLead(data: {
     },
   ];
 
-  // Lid custom fields — Viloyat + FBP + FBC
   const leadCustomFields: any[] = [];
 
-  // Viloyat
   if (data.viloyat && VILOYAT_ENUM_IDS[data.viloyat]) {
     leadCustomFields.push({
       field_id: VILOYAT_FIELD_ID,
@@ -171,7 +252,6 @@ async function createAmoCRMLead(data: {
     });
   }
 
-  // FBP
   if (FIELD_FBP && data.fbp) {
     leadCustomFields.push({
       field_id: parseInt(FIELD_FBP),
@@ -179,7 +259,6 @@ async function createAmoCRMLead(data: {
     });
   }
 
-  // FBC
   if (FIELD_FBC && data.fbc) {
     leadCustomFields.push({
       field_id: parseInt(FIELD_FBC),
@@ -187,7 +266,20 @@ async function createAmoCRMLead(data: {
     });
   }
 
-  // "Неразобранное" ga lid tushirish
+  if (FIELD_IP && data.clientIp) {
+    leadCustomFields.push({
+      field_id: parseInt(FIELD_IP),
+      values: [{ value: data.clientIp }],
+    });
+  }
+
+  if (FIELD_USER_AGENT && data.userAgent) {
+    leadCustomFields.push({
+      field_id: parseInt(FIELD_USER_AGENT),
+      values: [{ value: data.userAgent }],
+    });
+  }
+
   const unsortedPayload = [{
     source_name: "Website",
     source_uid: `web_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -196,7 +288,7 @@ async function createAmoCRMLead(data: {
       form_id: "website_form",
       form_name: "Website Lead Form",
       form_page: process.env.NEXT_PUBLIC_SITE_URL || "https://massajor.uz",
-      ip: "127.0.0.1",
+      ip: data.clientIp || "127.0.0.1",
       form_sent_at: Math.floor(Date.now() / 1000),
       referer: process.env.NEXT_PUBLIC_SITE_URL || "https://massajor.uz",
     },
@@ -231,7 +323,6 @@ async function createAmoCRMLead(data: {
 
   console.log("[AMOCRM] Неразобранное'ga lid tushdi! ID:", leadId, "Viloyat:", data.viloyat);
 
-  // Izoh: viloyat + telefon + comment
   if (leadId) {
     try {
       const noteText = [

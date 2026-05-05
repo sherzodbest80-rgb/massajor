@@ -1,6 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Meta webhook verification (GET)
+/**
+ * Meta webhook (Facebook Lead Ads)
+ *
+ * MUHIM: Lead Ads formasi to'ldirilganda Meta avtomatik Lead eventini hisoblaydi.
+ * Biz bu yerda Meta'ga qayta event YUBORMAYMIZ (dublikat bo'lmasligi uchun).
+ * Faqat AmoCRM'ga lid o'tkazamiz.
+ *
+ * Keyinchalik bu lead Sotildi bosqichiga o'tganda — amocrm-purchase webhook
+ * Purchase eventini yuboradi va u Meta tomonidan asl Lead Ads click bilan
+ * bog'lanadi (chunki external_id orqali).
+ */
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const mode = searchParams.get("hub.mode");
@@ -20,7 +31,6 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
 
-// Meta webhook events (POST)
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -42,7 +52,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleLeadgenEvent(value: any) {
-  const { leadgen_id, form_id } = value;
+  const { leadgen_id, form_id, ad_id, adset_id, campaign_id } = value;
   console.log("[LEADGEN] New lead:", leadgen_id);
 
   try {
@@ -56,18 +66,87 @@ async function handleLeadgenEvent(value: any) {
       fields[field.name] = field.values?.[0] || "";
     }
 
-    await fetch(`${process.env.NEXT_PUBLIC_SITE_URL}/api/lead`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: fields["full_name"] || fields["first_name"] || "Facebook Lead",
-        phone: fields["phone_number"] || fields["phone"] || "",
-        address: fields["city"] || fields["street_address"] || `Form: ${form_id}`,
-      }),
+    const fullName = fields["full_name"] || fields["first_name"] || "Facebook Lead";
+    const phone = fields["phone_number"] || fields["phone"] || "";
+    const city = fields["city"] || "";
+
+    // AmoCRM ga to'g'ridan-to'g'ri yuborish (api/lead orqali EMAS)
+    // Bu MUHIM — chunki api/lead Meta'ga Lead event yuboradi va dublikat bo'ladi.
+    // Bu yerda biz alohida "Lead Ads" manbasidan kelgan lid yaratamiz.
+    await createAmoLeadFromLeadAds({
+      name: fullName,
+      phone,
+      city,
+      leadgenId: leadgen_id,
+      formId: form_id,
+      adId: ad_id,
+      campaignId: campaign_id,
     });
 
-    console.log("[LEADGEN] Forwarded to CRM");
+    console.log("[LEADGEN] AmoCRM ga forward qilindi");
   } catch (err) {
     console.error("[LEADGEN ERROR]", err);
+  }
+}
+
+async function createAmoLeadFromLeadAds(data: {
+  name: string;
+  phone: string;
+  city: string;
+  leadgenId: string;
+  formId: string;
+  adId?: string;
+  campaignId?: string;
+}) {
+  const DOMAIN = process.env.AMOCRM_DOMAIN;
+  const ACCESS_TOKEN = process.env.AMOCRM_ACCESS_TOKEN;
+  const PIPELINE_ID = process.env.AMOCRM_PIPELINE_ID
+    ? parseInt(process.env.AMOCRM_PIPELINE_ID)
+    : null;
+
+  if (!DOMAIN || !ACCESS_TOKEN) return;
+
+  const baseUrl = `https://${DOMAIN}`;
+  const headers = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${ACCESS_TOKEN}`,
+  };
+
+  const unsortedPayload = [{
+    source_name: "Facebook Lead Ads",
+    source_uid: `fb_leadgen_${data.leadgenId}`,
+    ...(PIPELINE_ID ? { pipeline_id: PIPELINE_ID } : {}),
+    metadata: {
+      form_id: data.formId,
+      form_name: `Facebook Lead Form ${data.formId}`,
+      form_page: "facebook.com",
+      ip: "0.0.0.0",
+      form_sent_at: Math.floor(Date.now() / 1000),
+      referer: "facebook.com",
+    },
+    _embedded: {
+      leads: [{
+        name: `${data.name} - ${data.phone} (FB)`,
+        ...(PIPELINE_ID ? { pipeline_id: PIPELINE_ID } : {}),
+      }],
+      contacts: [{
+        name: data.name,
+        custom_fields_values: [{
+          field_code: "PHONE",
+          values: [{ value: data.phone, enum_code: "WORK" }],
+        }],
+      }],
+    },
+  }];
+
+  const res = await fetch(`${baseUrl}/api/v4/leads/unsorted/forms`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(unsortedPayload),
+  });
+
+  if (!res.ok) {
+    const errData = await res.json();
+    console.error("[AMOCRM LEAD ADS] Xatolik:", errData);
   }
 }
