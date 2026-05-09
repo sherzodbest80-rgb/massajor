@@ -3,39 +3,28 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
-type Platform = "Telegram" | "WhatsApp" | "Instagram" | "KakaoTalk" | "IMO" | "Boshqa";
-type Country = "AQSh" | "Turkiya" | "Janubiy Koreya" | "Boshqa davlat";
+type Platform = "Telegram" | "WhatsApp" | "KakaoTalk" | "IMO" | "Boshqa";
 
 const platforms: { value: Platform; label: string; icon: string }[] = [
   { value: "Telegram", label: "Telegram", icon: "✈️" },
   { value: "WhatsApp", label: "WhatsApp", icon: "💬" },
-  { value: "Instagram", label: "Instagram", icon: "📷" },
   { value: "KakaoTalk", label: "KakaoTalk", icon: "💛" },
   { value: "IMO", label: "Imo", icon: "📱" },
   { value: "Boshqa", label: "Boshqa", icon: "•••" },
 ];
 
-const countries: { value: Country; label: string; flag: string }[] = [
-  { value: "AQSh", label: "AQSh", flag: "🇺🇸" },
-  { value: "Turkiya", label: "Turkiya", flag: "🇹🇷" },
-  { value: "Janubiy Koreya", label: "Janubiy Koreya", flag: "🇰🇷" },
-  { value: "Boshqa davlat", label: "Boshqa davlat", flag: "🌍" },
-];
-
 const platformPlaceholders: Record<Platform, string> = {
-  Telegram: "@username",
+  Telegram: "@username yoki +1 234 567 8900",
   WhatsApp: "+1 234 567 8900",
-  Instagram: "@username",
-  KakaoTalk: "KakaoTalk ID",
+  KakaoTalk: "Telefon raqam yoki ID",
   IMO: "+998 90 123 45 67",
   Boshqa: "Username yoki raqam",
 };
 
 const platformLabels: Record<Platform, string> = {
-  Telegram: "Telegram username",
+  Telegram: "Telefon raqam yoki username",
   WhatsApp: "WhatsApp raqamingiz",
-  Instagram: "Instagram username",
-  KakaoTalk: "KakaoTalk ID",
+  KakaoTalk: "Telefon raqam yoki ID",
   IMO: "IMO raqamingiz",
   Boshqa: "Username yoki raqamingiz",
 };
@@ -47,9 +36,9 @@ export default function InternationalLeadForm() {
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState<Platform>("Telegram");
   const [contactValue, setContactValue] = useState("");
-  const [country, setCountry] = useState<Country>("AQSh");
+  const [country, setCountry] = useState("");
   const [time, setTime] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   // FB cookies o'qish (EMQ uchun)
@@ -74,7 +63,6 @@ export default function InternationalLeadForm() {
     setStatus("loading");
     setErrorMsg("");
 
-    // Validatsiya
     if (name.trim().length < 2) {
       setStatus("error");
       setErrorMsg("Iltimos, ismingizni kiriting");
@@ -84,6 +72,12 @@ export default function InternationalLeadForm() {
     if (contactValue.trim().length < 3) {
       setStatus("error");
       setErrorMsg("Iltimos, username yoki telefon raqamingizni kiriting");
+      return;
+    }
+
+    if (country.trim().length < 2) {
+      setStatus("error");
+      setErrorMsg("Iltimos, qaysi davlatdan ekanligingizni yozing");
       return;
     }
 
@@ -101,7 +95,7 @@ export default function InternationalLeadForm() {
           name: name.trim(),
           phone: contactValue.trim(),
           platforma: platform,
-          davlat: country,
+          davlat: country.trim(),
           bog_lanish_vaqti: time.trim(),
           contact_value: contactValue.trim(),
           product: productFromUrl,
@@ -118,7 +112,6 @@ export default function InternationalLeadForm() {
         throw new Error(data.error || "Server xatosi");
       }
 
-      // Muvaffaqiyatli — thanks sahifasiga o'tkazamiz
       window.location.href = "/thanks";
     } catch (error: any) {
       console.error(error);
@@ -141,19 +134,13 @@ export default function InternationalLeadForm() {
         </div>
 
         {/* Heading */}
-        <h1 className="text-2xl sm:text-3xl font-semibold leading-tight mb-3">
+        <h1 className="text-2xl sm:text-3xl font-semibold leading-tight mb-6">
           Masofadan turib
           <br />
           <span className="text-blue-400">OTA-ONANGIZNI</span>
           <br />
           xursand qiling
         </h1>
-
-        {/* Subtitle */}
-        <p className="text-sm text-blue-100 leading-relaxed mb-5 px-2">
-          O&apos;zbekiston bo&apos;ylab <strong className="text-white">bepul yetkazamiz</strong>.
-          Siz tashqarida bo&apos;lsangiz ham, biz ota-onangizning eshigigacha yetkazib beramiz.
-        </p>
 
         {/* Form Card */}
         <div className="bg-white rounded-2xl p-5 sm:p-6 text-left shadow-2xl">
@@ -222,28 +209,20 @@ export default function InternationalLeadForm() {
               />
             </div>
 
-            {/* Country */}
+            {/* Country - ERKIN MATN */}
             <div className="mb-3">
               <label className="block text-xs font-medium text-slate-800 mb-1.5">
                 Qaysi davlatdan murojaat qilyapsiz?
               </label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {countries.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => setCountry(c.value)}
-                    className={`px-2 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
-                      country === c.value
-                        ? "bg-blue-500 text-white"
-                        : "bg-slate-50 text-slate-800 border border-slate-200 hover:border-blue-300"
-                    }`}
-                  >
-                    <span>{c.flag}</span>
-                    {c.label}
-                  </button>
-                ))}
-              </div>
+              <input
+                type="text"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                placeholder="Masalan: AQSh, Turkiya, Janubiy Koreya"
+                disabled={status === "loading"}
+                required
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
+              />
             </div>
 
             {/* Time */}
@@ -280,19 +259,7 @@ export default function InternationalLeadForm() {
             >
               {status === "loading" ? "Yuborilmoqda..." : "So'rov yuborish →"}
             </button>
-
-            {/* Privacy */}
-            <div className="flex items-center justify-center gap-1 mt-2.5 text-[10px] text-slate-500">
-              🔒 Ma&apos;lumotlaringiz xavfsiz
-            </div>
           </form>
-        </div>
-
-        {/* Trust below */}
-        <div className="flex justify-center gap-3 mt-5 flex-wrap text-blue-100 text-xs">
-          <span className="flex items-center gap-1">🚚 Bepul yetkazib berish</span>
-          <span className="flex items-center gap-1">🛡️ Kafolat</span>
-          <span className="flex items-center gap-1">🎧 24/7 yordam</span>
         </div>
       </div>
     </section>
