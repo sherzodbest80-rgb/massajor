@@ -41,7 +41,6 @@ export default function InternationalLeadForm() {
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // FB cookies o'qish (EMQ uchun)
   const [fbp, setFbp] = useState<string>("");
   const [fbc, setFbc] = useState<string>("");
 
@@ -146,7 +145,7 @@ export default function InternationalLeadForm() {
         <div className="bg-white rounded-2xl p-5 sm:p-6 text-left shadow-2xl">
           <form onSubmit={handleSubmit}>
             {/* Info box */}
-            <div className="bg-gradient-to-r from-blue-50 to-slate-50 border-l-2 border-blue-500 rounded-md p-3 mb-4 flex gap-2 items-start">
+            <div className="bg-gradient-to-r from-blue-50 to-slate-50 border-l-2 border-blue-500 rounded-md p-3 mb-5 flex gap-2 items-start">
               <span className="text-blue-500 text-base flex-shrink-0">ℹ️</span>
               <p className="text-xs text-slate-800 leading-snug m-0">
                 Ushbu formani diqqat bilan to&apos;ldiring va menejerlarimiz siz bilan bog&apos;lanib ma&apos;lumot berishadi
@@ -154,8 +153,8 @@ export default function InternationalLeadForm() {
             </div>
 
             {/* Name */}
-            <div className="mb-3">
-              <label className="block text-xs font-medium text-slate-800 mb-1.5">
+            <div className="mb-4">
+              <label className="block text-sm font-bold text-slate-900 mb-2">
                 Ismingiz
               </label>
               <input
@@ -165,13 +164,13 @@ export default function InternationalLeadForm() {
                 placeholder="Masalan: Akmal"
                 disabled={status === "loading"}
                 required
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
               />
             </div>
 
             {/* Platform */}
-            <div className="mb-3">
-              <label className="block text-xs font-medium text-slate-800 mb-1.5">
+            <div className="mb-4">
+              <label className="block text-sm font-bold text-slate-900 mb-2">
                 Siz bilan qaysi platformada bog&apos;lansak bo&apos;ladi?
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
@@ -194,8 +193,8 @@ export default function InternationalLeadForm() {
             </div>
 
             {/* Contact value (dynamic label) */}
-            <div className="mb-3">
-              <label className="block text-xs font-medium text-slate-800 mb-1.5">
+            <div className="mb-4">
+              <label className="block text-sm font-bold text-slate-900 mb-2">
                 {platformLabels[platform]}
               </label>
               <input
@@ -205,13 +204,13 @@ export default function InternationalLeadForm() {
                 placeholder={platformPlaceholders[platform]}
                 disabled={status === "loading"}
                 required
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
               />
             </div>
 
-            {/* Country - ERKIN MATN */}
-            <div className="mb-3">
-              <label className="block text-xs font-medium text-slate-800 mb-1.5">
+            {/* Country - erkin matn */}
+            <div className="mb-4">
+              <label className="block text-sm font-bold text-slate-900 mb-2">
                 Qaysi davlatdan murojaat qilyapsiz?
               </label>
               <input
@@ -221,13 +220,13 @@ export default function InternationalLeadForm() {
                 placeholder="Masalan: AQSh, Turkiya, Janubiy Koreya"
                 disabled={status === "loading"}
                 required
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
               />
             </div>
 
             {/* Time */}
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-slate-800 mb-1.5">
+            <div className="mb-5">
+              <label className="block text-sm font-bold text-slate-900 mb-2">
                 Siz bilan qaysi vaqtda bog&apos;lansak bo&apos;ladi?
               </label>
               <input
@@ -237,11 +236,8 @@ export default function InternationalLeadForm() {
                 placeholder="Masalan: ertalab 9:00–11:00"
                 disabled={status === "loading"}
                 required
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
               />
-              <p className="text-[10px] text-slate-500 mt-1">
-                Shuni o&apos;zingiz turgan mamlakat vaqti bilan yozing
-              </p>
             </div>
 
             {/* Error */}
