@@ -11,6 +11,13 @@ interface LeadPayload {
   fbc?: string;
   userAgent?: string;
   pageUrl?: string;
+  // YANGI maydonlar (xalqaro forma uchun)
+  platforma?: string;
+  davlat?: string;
+  bog_lanish_vaqti?: string;
+  contact_value?: string; // username yoki tel raqam
+  product?: string; // URL parametridan keladi
+  source?: string; // qaysi formadan keldi (uz / forma)
 }
 
 // Viloyat nomi → amoCRM enum_id mapping (custom field 316123)
@@ -51,7 +58,24 @@ const VILOYAT_FIELD_ID = 316123;
 export async function POST(req: NextRequest) {
   try {
     const body: LeadPayload = await req.json();
-    const { name, phone, address, viloyat, comment, fbp, fbc, userAgent, pageUrl } = body;
+    const {
+      name,
+      phone,
+      address,
+      viloyat,
+      comment,
+      fbp,
+      fbc,
+      userAgent,
+      pageUrl,
+      // YANGI maydonlar
+      platforma,
+      davlat,
+      bog_lanish_vaqti,
+      contact_value,
+      product,
+      source,
+    } = body;
 
     if (!name || !phone) {
       return NextResponse.json({ error: "Ism va telefon majburiy" }, { status: 400 });
@@ -62,27 +86,39 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ||
       "127.0.0.1";
 
+    // YANGI: Xalqaro forma uchun comment yaratish
+    let finalComment = comment || "";
+    if (source === "forma") {
+      const parts: string[] = [];
+      if (platforma) parts.push(`📱 Platforma: ${platforma}`);
+      if (contact_value) parts.push(`👤 Username/Raqam: ${contact_value}`);
+      if (davlat) parts.push(`🌍 Davlat: ${davlat}`);
+      if (bog_lanish_vaqti) parts.push(`⏰ Qulay vaqt: ${bog_lanish_vaqti}`);
+      if (product) parts.push(`📦 Mahsulot: ${product}`);
+      parts.push(`🔗 Manba: forma sahifasi (xorijdan)`);
+      finalComment = parts.join("\n");
+    }
+
     // 1-QADAM: AmoCRM'ga yuborish (try/catch bilan o'ralgan)
-    // Agar AmoCRM xato bersa, Meta'ga baribir event yuboramiz
     let amoResult: any = null;
     try {
       amoResult = await createAmoCRMLead({
         name,
         phone,
-        address: address || viloyat || "",
+        address: address || viloyat || davlat || "",
         viloyat: viloyat || "",
-        comment: comment || "",
+        comment: finalComment,
         fbp,
         fbc,
         clientIp,
         userAgent: userAgent || "",
       });
     } catch (amoErr: any) {
-      console.error("[AMOCRM XATO] Lid yaratilmadi, lekin Meta'ga baribir yuboramiz:", amoErr.message);
+      console.error("[AMOCRM XATO]", amoErr.message);
       amoResult = { error: amoErr.message };
     }
 
-    // 2-QADAM: Meta'ga yuborish (har doim ishlaydi)
+    // 2-QADAM: Meta'ga yuborish
     let metaResult: any = null;
     try {
       metaResult = await sendToMetaCAPI({
@@ -102,7 +138,6 @@ export async function POST(req: NextRequest) {
       metaResult = { error: metaErr.message };
     }
 
-    // Agar AmoCRM ham, Meta ham xato bergan bo'lsa — foydalanuvchiga xato qaytaramiz
     if (amoResult?.error && metaResult?.error) {
       return NextResponse.json(
         { error: "Xizmat vaqtincha ishlamayapti, iltimos qayta urining" },
@@ -110,7 +145,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Hech bo'lmaganda biri ishlasa — muvaffaqiyat
     return NextResponse.json({ success: true, meta: metaResult, amo: amoResult });
   } catch (err: any) {
     console.error("[LEAD API ERROR]", err);
@@ -143,12 +177,10 @@ async function sendToMetaCAPI(data: {
 
   const normalizedPhone = data.phone.replace(/[\s\-\(\)\+]/g, "");
 
-  // Ism va familiyani ajratish
   const nameParts = data.name.trim().split(/\s+/);
   const firstName = nameParts[0] || "";
   const lastName = nameParts.slice(1).join(" ");
 
-  // user_data ni dinamik qurish — bo'sh qiymatlarni QO'SHMAYMIZ
   const userData: Record<string, any> = {
     ph: [hash(normalizedPhone)],
     client_ip_address: data.clientIp,
@@ -323,13 +355,13 @@ async function createAmoCRMLead(data: {
 
   console.log("[AMOCRM] Неразобранное'ga lid tushdi! ID:", leadId, "Viloyat:", data.viloyat);
 
-  if (leadId) {
+  if (leadId && data.comment) {
     try {
       const noteText = [
         `Mijoz: ${data.name}`,
         `Telefon: ${data.phone}`,
         data.viloyat ? `Viloyat: ${data.viloyat}` : "",
-        data.comment ? `Izoh: ${data.comment}` : "",
+        data.comment ? `\n${data.comment}` : "",
       ].filter(Boolean).join("\n");
 
       await fetch(`${baseUrl}/api/v4/leads/${leadId}/notes`, {
