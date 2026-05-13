@@ -11,16 +11,16 @@ interface LeadPayload {
   fbc?: string;
   userAgent?: string;
   pageUrl?: string;
-  // YANGI maydonlar (xalqaro forma uchun)
+  // Xalqaro forma maydonlari
   platforma?: string;
   davlat?: string;
   bog_lanish_vaqti?: string;
-  contact_value?: string; // username yoki tel raqam
-  product?: string; // URL parametridan keladi
-  source?: string; // qaysi formadan keldi (uz / forma)
+  contact_value?: string;
+  product?: string;
+  source?: string;
 }
 
-// Viloyat nomi → amoCRM enum_id mapping (custom field 316123)
+// Viloyat nomi → amoCRM enum_id mapping
 const VILOYAT_ENUM_IDS: Record<string, number> = {
   "Toshkent": 622167,
   "Andijon": 622169,
@@ -36,7 +36,6 @@ const VILOYAT_ENUM_IDS: Record<string, number> = {
   "Namangan": 165431,
 };
 
-// Viloyat nomi → Meta uchun shahar slug (lowercase, no spaces)
 const VILOYAT_TO_CITY: Record<string, string> = {
   "Toshkent": "tashkent",
   "Andijon": "andijan",
@@ -68,7 +67,6 @@ export async function POST(req: NextRequest) {
       fbc,
       userAgent,
       pageUrl,
-      // YANGI maydonlar
       platforma,
       davlat,
       bog_lanish_vaqti,
@@ -86,7 +84,7 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ||
       "127.0.0.1";
 
-    // YANGI: Xalqaro forma uchun comment yaratish
+    // Xalqaro forma uchun comment yaratish
     let finalComment = comment || "";
     if (source === "forma") {
       const parts: string[] = [];
@@ -99,7 +97,16 @@ export async function POST(req: NextRequest) {
       finalComment = parts.join("\n");
     }
 
-    // 1-QADAM: AmoCRM'ga yuborish (try/catch bilan o'ralgan)
+    // Ichki bozor (zayavka) uchun comment
+    if (source === "zayavka") {
+      const parts: string[] = [];
+      if (bog_lanish_vaqti) parts.push(`⏰ Qulay vaqt: ${bog_lanish_vaqti}`);
+      if (product) parts.push(`📦 Mahsulot: ${product}`);
+      parts.push(`🔗 Manba: zayavka sahifasi (ichki bozor)`);
+      finalComment = parts.join("\n");
+    }
+
+    // 1-QADAM: AmoCRM'ga yuborish
     let amoResult: any = null;
     try {
       amoResult = await createAmoCRMLead({
@@ -138,6 +145,24 @@ export async function POST(req: NextRequest) {
       metaResult = { error: metaErr.message };
     }
 
+    // 3-QADAM: Telegram'ga yuborish (yangi!)
+    try {
+      await sendToTelegram({
+        name,
+        phone,
+        platforma,
+        contact_value,
+        davlat,
+        bog_lanish_vaqti,
+        product,
+        source: source || "noma'lum",
+        amoLeadId: amoResult?.leadId,
+      });
+    } catch (tgErr: any) {
+      console.error("[TELEGRAM XATO]", tgErr.message);
+      // Telegram xato bo'lsa ham, lid muvaffaqiyatli hisoblanadi
+    }
+
     if (amoResult?.error && metaResult?.error) {
       return NextResponse.json(
         { error: "Xizmat vaqtincha ishlamayapti, iltimos qayta urining" },
@@ -150,6 +175,93 @@ export async function POST(req: NextRequest) {
     console.error("[LEAD API ERROR]", err);
     return NextResponse.json({ error: err.message || "Server xatoligi" }, { status: 500 });
   }
+}
+
+// YANGI FUNKSIYA: Telegram guruhga lid yuborish
+async function sendToTelegram(data: {
+  name: string;
+  phone: string;
+  platforma?: string;
+  contact_value?: string;
+  davlat?: string;
+  bog_lanish_vaqti?: string;
+  product?: string;
+  source: string;
+  amoLeadId?: number;
+}) {
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+  const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+  if (!BOT_TOKEN || !CHAT_ID) {
+    console.warn("[TELEGRAM] credentials yo'q, o'tkazib yuborildi");
+    return { skipped: true };
+  }
+
+  // Manba turini aniqlash
+  let sourceLabel = "Noma'lum manba";
+  if (data.source === "forma") sourceLabel = "🌍 Xorijdan (forma)";
+  else if (data.source === "zayavka") sourceLabel = "🇺🇿 Ichki bozor (zayavka)";
+
+  // Xabar matnini tayyorlash
+  const lines: string[] = [
+    `🆕 <b>YANGI LID!</b>`,
+    ``,
+    `👤 <b>Ism:</b> ${escapeHtml(data.name)}`,
+    `📞 <b>Aloqa:</b> ${escapeHtml(data.phone)}`,
+  ];
+
+  if (data.platforma) {
+    lines.push(`📱 <b>Platforma:</b> ${escapeHtml(data.platforma)}`);
+  }
+
+  if (data.davlat) {
+    lines.push(`🌐 <b>Davlat:</b> ${escapeHtml(data.davlat)}`);
+  }
+
+  if (data.bog_lanish_vaqti) {
+    lines.push(`⏰ <b>Qulay vaqt:</b> ${escapeHtml(data.bog_lanish_vaqti)}`);
+  }
+
+  if (data.product) {
+    lines.push(`📦 <b>Mahsulot:</b> ${escapeHtml(data.product)}`);
+  }
+
+  lines.push(``);
+  lines.push(`🔗 <b>Manba:</b> ${sourceLabel}`);
+
+  if (data.amoLeadId) {
+    lines.push(`🆔 <b>AmoCRM ID:</b> ${data.amoLeadId}`);
+  }
+
+  const message = lines.join("\n");
+
+  const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: CHAT_ID,
+      text: message,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+    }),
+  });
+
+  const result = await res.json();
+  if (!res.ok) {
+    console.error("[TELEGRAM ERROR]", result);
+    throw new Error(`Telegram API xatosi: ${result.description || "unknown"}`);
+  }
+
+  console.log("[TELEGRAM] ✅ Lid guruhga yuborildi");
+  return result;
+}
+
+// HTML belgilarni escape qilish (xavfsizlik uchun)
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 async function sendToMetaCAPI(data: {
