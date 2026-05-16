@@ -71,6 +71,13 @@ export default function InternalLeadForm() {
     }
 
     try {
+      // YANGI: Pixel bilan dedup uchun event_id yaratamiz
+      const eventId = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+      // localStorage'ga saqlaymiz — thanks sahifa Pixel uchun shu ID dan foydalanadi
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("fb_lead_event_id", eventId);
+      }
+
       const response = await fetch("/api/lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -84,6 +91,7 @@ export default function InternalLeadForm() {
           fbc,
           userAgent: navigator.userAgent,
           pageUrl: window.location.href,
+          event_id: eventId, // YANGI
         }),
       });
 
