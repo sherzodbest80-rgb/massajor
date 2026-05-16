@@ -8,6 +8,48 @@ const COUNTDOWN_SECONDS = 10;
 export default function ThanksPage() {
   const [seconds, setSeconds] = useState(COUNTDOWN_SECONDS);
 
+  // YANGI: Sahifa ochilganda Pixel Lead event yuboramiz (dedup uchun event_id bilan)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // localStorage'dan event_id ni olamiz (forma yuborilganda saqlangan)
+    const eventId = window.localStorage.getItem("fb_lead_event_id");
+
+    // Pixel (fbq) yuklangani kutamiz va Lead event yuboramiz
+    const fireLeadEvent = () => {
+      const fbq = (window as any).fbq;
+      if (typeof fbq !== "function") return false;
+
+      // Pixel Lead event — Server CAPI bilan bir xil event_id (dedup)
+      if (eventId) {
+        fbq(
+          "track",
+          "Lead",
+          { currency: "UZS", value: 0 },
+          { eventID: eventId }
+        );
+        console.log("[Pixel] Lead event yuborildi, eventID:", eventId);
+      } else {
+        // Agar event_id yo'q bo'lsa (masalan, foydalanuvchi /thanks ga to'g'ridan-to'g'ri kirgan)
+        // Lead event YUBORMAYMIZ — dedup ishlamaydi, Facebook xato beradi
+        console.warn("[Pixel] event_id yo'q, Lead event yuborilmadi");
+      }
+
+      // Bir martagina yuborilsin
+      window.localStorage.removeItem("fb_lead_event_id");
+      return true;
+    };
+
+    // fbq darhol mavjud bo'lmasligi mumkin (Pixel asinxron yuklanadi)
+    if (!fireLeadEvent()) {
+      const intervalId = setInterval(() => {
+        if (fireLeadEvent()) clearInterval(intervalId);
+      }, 200);
+      // Eng ko'p 5 sekund kutamiz
+      setTimeout(() => clearInterval(intervalId), 5000);
+    }
+  }, []); // [] — faqat 1 marta ishga tushadi
+
   useEffect(() => {
     window.scrollTo(0, 0);
 
