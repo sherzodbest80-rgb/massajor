@@ -18,6 +18,8 @@ interface LeadPayload {
   contact_value?: string;
   product?: string;
   source?: string;
+  // YANGI: Pixel bilan deduplikatsiya uchun
+  event_id?: string;
 }
 
 // Viloyat nomi → amoCRM enum_id mapping
@@ -73,6 +75,7 @@ export async function POST(req: NextRequest) {
       contact_value,
       product,
       source,
+      event_id, // YANGI: brauzerdan keladi (Pixel bilan dedup uchun)
     } = body;
 
     if (!name || !phone) {
@@ -139,6 +142,7 @@ export async function POST(req: NextRequest) {
         pageUrl: pageUrl || process.env.NEXT_PUBLIC_SITE_URL || "",
         contactId: amoResult?.contactId ? String(amoResult.contactId) : "",
         leadId: amoResult?.leadId ? String(amoResult.leadId) : "",
+        eventId: event_id, // YANGI: brauzerdan kelgan event_id
       });
     } catch (metaErr: any) {
       console.error("[META XATO]", metaErr.message);
@@ -275,6 +279,7 @@ async function sendToMetaCAPI(data: {
   pageUrl: string;
   contactId: string;
   leadId: string;
+  eventId?: string; // YANGI
 }) {
   const PIXEL_ID = process.env.META_PIXEL_ID;
   const ACCESS_TOKEN = process.env.META_ACCESS_TOKEN;
@@ -313,20 +318,33 @@ async function sendToMetaCAPI(data: {
   if (data.fbp) userData.fbp = data.fbp;
   if (data.fbc) userData.fbc = data.fbc;
 
+  // MUHIM: event_id brauzerdan keladi (Pixel bilan dedup uchun)
+  // Agar yo'q bo'lsa, fallback sifatida leadId yoki timestamp ishlatamiz
+  const finalEventId =
+    data.eventId || (data.leadId ? `lead_${data.leadId}` : `lead_${Date.now()}`);
+
   const payload = {
-    data: [{
-      event_name: "Lead",
-      event_time: Math.floor(Date.now() / 1000),
-      event_id: data.leadId ? `lead_${data.leadId}` : `lead_${Date.now()}`,
-      event_source_url: data.pageUrl,
-      action_source: "website",
-      user_data: userData,
-    }],
+    data: [
+      {
+        event_name: "Lead",
+        event_time: Math.floor(Date.now() / 1000),
+        event_id: finalEventId, // Pixel bilan bir xil bo'lishi kerak (dedup)
+        event_source_url: data.pageUrl,
+        action_source: "website",
+        user_data: userData,
+        // YANGI: Meta diagnostikasi valyutani talab qiladi
+        custom_data: {
+          currency: "UZS",
+          value: 0,
+        },
+      },
+    ],
     ...(process.env.META_TEST_EVENT_CODE
       ? { test_event_code: process.env.META_TEST_EVENT_CODE }
       : {}),
   };
 
+  console.log("[META CAPI] event_id:", finalEventId);
   console.log("[META CAPI] user_data keys:", Object.keys(userData));
 
   const res = await fetch(
