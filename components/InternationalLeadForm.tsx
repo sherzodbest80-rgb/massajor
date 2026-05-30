@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Platform = "Telegram" | "WhatsApp" | "KakaoTalk" | "IMO" | "Boshqa";
@@ -43,6 +43,18 @@ export default function InternationalLeadForm() {
 
   const [fbp, setFbp] = useState<string>("");
   const [fbc, setFbc] = useState<string>("");
+
+  // YANGI: Video uchun
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const handlePlayVideo = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = false; // Ovozni yoqamiz
+    video.play();
+    setIsPlaying(true);
+  };
 
   useEffect(() => {
     if (typeof document !== "undefined") {
@@ -87,12 +99,9 @@ export default function InternationalLeadForm() {
     }
 
     try {
-      // YANGI: Pixel bilan dedup uchun event_id yaratamiz
       const eventId = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-      // localStorage'ga saqlaymiz — thanks sahifa Pixel uchun shu ID dan foydalanadi
       if (typeof window !== "undefined") {
         window.localStorage.setItem("fb_lead_event_id", eventId);
-        // YANGI: tanlangan platforma'ni saqlaymiz — /thanks sahifasi qaysi tugmani ko'rsatishini bilsin
         window.localStorage.setItem("lead_platform", platform);
       }
 
@@ -112,7 +121,7 @@ export default function InternationalLeadForm() {
           fbc,
           userAgent: navigator.userAgent,
           pageUrl: window.location.href,
-          event_id: eventId, // YANGI
+          event_id: eventId,
         }),
       });
 
@@ -150,6 +159,42 @@ export default function InternationalLeadForm() {
           <br />
           xursand qiling
         </h1>
+
+        {/* YANGI: DUMALOQ VIDEO (Telegram uslubi) */}
+        <div className="flex justify-center mb-6">
+          <div
+            className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-full overflow-hidden shadow-2xl ring-4 ring-blue-500/30 cursor-pointer animate-pulse-ring"
+            onClick={!isPlaying ? handlePlayVideo : undefined}
+          >
+            <video
+              ref={videoRef}
+              src="/konversiya.mp4"
+              className="w-full h-full object-cover"
+              playsInline
+              preload="metadata"
+              controls={isPlaying}
+              muted={!isPlaying}
+              loop={!isPlaying}
+              autoPlay={false}
+            />
+
+            {/* Play tugmasi (faqat boshlanmaganda ko'rinadi) */}
+            {!isPlaying && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
+                <div className="w-20 h-20 rounded-full bg-white/95 flex items-center justify-center shadow-xl animate-pulse-btn">
+                  <svg className="w-10 h-10 text-blue-600 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Video ostida kichik matn */}
+        <p className="text-sm text-blue-200/80 mb-6">
+          Narx va yetkazib berish haqida 1 daqiqalik video
+        </p>
 
         {/* Form Card */}
         <div className="bg-white rounded-2xl p-5 sm:p-6 text-left shadow-2xl">
@@ -202,7 +247,7 @@ export default function InternationalLeadForm() {
               </div>
             </div>
 
-            {/* Contact value (dynamic label) */}
+            {/* Contact value */}
             <div className="mb-4">
               <label className="block text-sm font-bold text-slate-900 mb-2">
                 {platformLabels[platform]}
@@ -218,7 +263,7 @@ export default function InternationalLeadForm() {
               />
             </div>
 
-            {/* Country - erkin matn */}
+            {/* Country */}
             <div className="mb-4">
               <label className="block text-sm font-bold text-slate-900 mb-2">
                 Qaysi davlatdan murojaat qilyapsiz?
@@ -268,6 +313,27 @@ export default function InternationalLeadForm() {
           </form>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes pulse-ring {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+          }
+          50% {
+            box-shadow: 0 0 0 12px rgba(59, 130, 246, 0);
+          }
+        }
+        .animate-pulse-ring {
+          animation: pulse-ring 2s ease-in-out infinite;
+        }
+        @keyframes pulse-btn {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.1); }
+        }
+        .animate-pulse-btn {
+          animation: pulse-btn 1.5s ease-in-out infinite;
+        }
+      `}</style>
     </section>
   );
 }
