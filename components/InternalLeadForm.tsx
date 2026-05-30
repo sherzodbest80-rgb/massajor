@@ -17,16 +17,33 @@ export default function InternalLeadForm() {
   const [fbc, setFbc] = useState<string>("");
 
   useEffect(() => {
-    if (typeof document !== "undefined") {
-      const cookies = document.cookie.split("; ").reduce((acc, cookie) => {
-        const [key, value] = cookie.split("=");
-        if (key && value) acc[key] = value;
-        return acc;
-      }, {} as Record<string, string>);
+    if (typeof document === "undefined") return;
 
-      setFbp(cookies._fbp || "");
-      setFbc(cookies._fbc || "");
+    // Cookie'larni o'qiymiz
+    const cookies = document.cookie.split("; ").reduce((acc, cookie) => {
+      const [key, value] = cookie.split("=");
+      if (key && value) acc[key] = value;
+      return acc;
+    }, {} as Record<string, string>);
+
+    // FBP — cookie'dan to'g'ridan-to'g'ri (o'zgartirishsiz)
+    setFbp(cookies._fbp || "");
+
+    // FBC — to'g'ri yo'l: avval URL'dan fbclid ni qaraymiz, keyin cookie
+    // MUHIM: fbclid katta-kichik harfga sezgir, o'zgartirishga ruxsat yo'q (Meta qoidasi)
+    const urlParams = new URLSearchParams(window.location.search);
+    const fbclidFromUrl = urlParams.get("fbclid");
+
+    if (fbclidFromUrl) {
+      // URL'da fbclid bor — Meta talab qilgan formatda fbc yasaymiz
+      // Format: fb.1.{timestamp_ms}.{fbclid} — fbclid AYNAN o'zgartirilmagan
+      const fbcValue = `fb.1.${Date.now()}.${fbclidFromUrl}`;
+      setFbc(fbcValue);
+    } else if (cookies._fbc) {
+      // URL'da yo'q — cookie'dan olamiz (o'zgartirishsiz)
+      setFbc(cookies._fbc);
     }
+    // URL va cookie ikkalasida ham yo'q — fbc yubormaymiz (Meta talabi)
   }, []);
 
   // Telefon raqamini formatlash: +998 __ ___ __ __
@@ -71,11 +88,12 @@ export default function InternalLeadForm() {
     }
 
     try {
-      // YANGI: Pixel bilan dedup uchun event_id yaratamiz
       const eventId = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-      // localStorage'ga saqlaymiz — thanks sahifa Pixel uchun shu ID dan foydalanadi
       if (typeof window !== "undefined") {
         window.localStorage.setItem("fb_lead_event_id", eventId);
+        // YANGI: Ichki forma uchun platforma bo'sh (telefon orqali)
+        // /thanks sahifa ikkala tugmani (WhatsApp + Telegram) ko'rsatadi
+        window.localStorage.removeItem("lead_platform");
       }
 
       const response = await fetch("/api/lead", {
@@ -91,7 +109,7 @@ export default function InternalLeadForm() {
           fbc,
           userAgent: navigator.userAgent,
           pageUrl: window.location.href,
-          event_id: eventId, // YANGI
+          event_id: eventId,
         }),
       });
 
