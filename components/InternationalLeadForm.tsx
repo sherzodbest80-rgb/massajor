@@ -92,6 +92,8 @@ export default function InternationalLeadForm() {
       // localStorage'ga saqlaymiz — thanks sahifa Pixel uchun shu ID dan foydalanadi
       if (typeof window !== "undefined") {
         window.localStorage.setItem("fb_lead_event_id", eventId);
+        // YANGI: tanlangan platforma'ni saqlaymiz — /thanks sahifasi qaysi tugmani ko'rsatishini bilsin
+        window.localStorage.setItem("lead_platform", platform);
       }
 
       const response = await fetch("/api/lead", {
@@ -137,7 +139,7 @@ export default function InternationalLeadForm() {
         {/* Badge */}
         <div className="inline-flex items-center gap-1.5 bg-blue-500/15 text-blue-300 px-3 py-1.5 rounded-full text-xs font-medium mb-4 border border-blue-500/30">
           <span>❤️</span>
-          Ota-onangiz uchun sovg'a
+          Ota-onangiz uchun sovg&apos;a
         </div>
 
         {/* Heading */}
