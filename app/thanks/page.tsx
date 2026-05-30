@@ -103,7 +103,7 @@ export default function ThanksPage() {
           <div className="mb-8 space-y-3">
             {/* WhatsApp tugmasi */}
             {(isWhatsApp || (!isWhatsApp && !isTelegram)) && (
-              
+              <a
                 href={waLink}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -118,7 +118,7 @@ export default function ThanksPage() {
 
             {/* Telegram tugmasi */}
             {(isTelegram || (!isWhatsApp && !isTelegram)) && (
-              
+              <a
                 href={tgLink}
                 target="_blank"
                 rel="noopener noreferrer"
