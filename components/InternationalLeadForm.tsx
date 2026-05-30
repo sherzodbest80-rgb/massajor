@@ -44,14 +44,14 @@ export default function InternationalLeadForm() {
   const [fbp, setFbp] = useState<string>("");
   const [fbc, setFbc] = useState<string>("");
 
-  // YANGI: Video uchun
+  // Video uchun
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const handlePlayVideo = () => {
     const video = videoRef.current;
     if (!video) return;
-    video.muted = false; // Ovozni yoqamiz
+    video.muted = false;
     video.play();
     setIsPlaying(true);
   };
@@ -160,7 +160,7 @@ export default function InternationalLeadForm() {
           xursand qiling
         </h1>
 
-        {/* YANGI: DUMALOQ VIDEO (Telegram uslubi) */}
+        {/* DUMALOQ VIDEO (Telegram uslubi) - poster + preload bilan */}
         <div className="flex justify-center mb-6">
           <div
             className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-full overflow-hidden shadow-2xl ring-4 ring-blue-500/30 cursor-pointer animate-pulse-ring"
@@ -169,9 +169,10 @@ export default function InternationalLeadForm() {
             <video
               ref={videoRef}
               src="/konversiya.mp4"
+              poster="/poster.jpg"
               className="w-full h-full object-cover"
               playsInline
-              preload="metadata"
+              preload="auto"
               controls={isPlaying}
               muted={!isPlaying}
               loop={!isPlaying}
