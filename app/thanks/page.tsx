@@ -29,7 +29,7 @@ export default function ThanksPage() {
       const fbq = (window as any).fbq;
       if (typeof fbq !== "function") return false;
       if (eventId) {
-        fbq("track", "Lead", { currency: "UZS", value: 0 }, { eventID: eventId });
+        fbq("track", "Lead", { currency: "UZS", value: 185000 }, { eventID: eventId });
         console.log("[Pixel] Lead event yuborildi, eventID:", eventId);
       } else {
         console.warn("[Pixel] event_id yo'q, Lead event yuborilmadi");
