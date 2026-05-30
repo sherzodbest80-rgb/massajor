@@ -335,7 +335,7 @@ async function sendToMetaCAPI(data: {
         // YANGI: Meta diagnostikasi valyutani talab qiladi
         custom_data: {
           currency: "UZS",
-          value: 0,
+          value: 185000,
         },
       },
     ],
