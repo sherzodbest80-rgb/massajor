@@ -46,7 +46,7 @@ export default function InternationalLeadForm() {
 
   // Video uchun
   const videoRef = useRef<HTMLVideoElement>(null);
-  const formRef = useRef<HTMLDivElement>(null); // YANGI: formaga scroll uchun
+  const formRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const handlePlayVideo = () => {
@@ -57,7 +57,6 @@ export default function InternationalLeadForm() {
     setIsPlaying(true);
   };
 
-  // YANGI: Video tugagach formaga avtomatik scroll
   const handleVideoEnded = () => {
     if (formRef.current) {
       formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -65,16 +64,33 @@ export default function InternationalLeadForm() {
   };
 
   useEffect(() => {
-    if (typeof document !== "undefined") {
-      const cookies = document.cookie.split("; ").reduce((acc, cookie) => {
-        const [key, value] = cookie.split("=");
-        if (key && value) acc[key] = value;
-        return acc;
-      }, {} as Record<string, string>);
+    if (typeof document === "undefined") return;
 
-      setFbp(cookies._fbp || "");
-      setFbc(cookies._fbc || "");
+    // Cookie'larni o'qiymiz
+    const cookies = document.cookie.split("; ").reduce((acc, cookie) => {
+      const [key, value] = cookie.split("=");
+      if (key && value) acc[key] = value;
+      return acc;
+    }, {} as Record<string, string>);
+
+    // FBP — cookie'dan to'g'ridan-to'g'ri (o'zgartirishsiz)
+    setFbp(cookies._fbp || "");
+
+    // FBC — to'g'ri yo'l: avval URL'dan fbclid ni qaraymiz, keyin cookie
+    // MUHIM: fbclid katta-kichik harfga sezgir, o'zgartirishga ruxsat yo'q (Meta qoidasi)
+    const urlParams = new URLSearchParams(window.location.search);
+    const fbclidFromUrl = urlParams.get("fbclid");
+
+    if (fbclidFromUrl) {
+      // URL'da fbclid bor — Meta talab qilgan formatda fbc yasaymiz
+      // Format: fb.1.{timestamp_ms}.{fbclid} — fbclid AYNAN o'zgartirilmagan
+      const fbcValue = `fb.1.${Date.now()}.${fbclidFromUrl}`;
+      setFbc(fbcValue);
+    } else if (cookies._fbc) {
+      // URL'da yo'q — cookie'dan olamiz (o'zgartirishsiz)
+      setFbc(cookies._fbc);
     }
+    // URL va cookie ikkalasida ham yo'q — fbc yubormaymiz (Meta talabi)
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
