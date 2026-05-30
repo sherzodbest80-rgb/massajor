@@ -46,6 +46,7 @@ export default function InternationalLeadForm() {
 
   // Video uchun
   const videoRef = useRef<HTMLVideoElement>(null);
+  const formRef = useRef<HTMLDivElement>(null); // YANGI: formaga scroll uchun
   const [isPlaying, setIsPlaying] = useState(false);
 
   const handlePlayVideo = () => {
@@ -54,6 +55,13 @@ export default function InternationalLeadForm() {
     video.muted = false;
     video.play();
     setIsPlaying(true);
+  };
+
+  // YANGI: Video tugagach formaga avtomatik scroll
+  const handleVideoEnded = () => {
+    if (formRef.current) {
+      formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   };
 
   useEffect(() => {
@@ -139,20 +147,20 @@ export default function InternationalLeadForm() {
   };
 
   return (
-    <section className="min-h-screen bg-gradient-to-b from-[#042C53] to-[#021A33] text-white relative overflow-hidden py-12 px-5">
+    <section className="min-h-screen bg-gradient-to-b from-[#042C53] to-[#021A33] text-white relative overflow-hidden py-6 px-5">
       {/* Decorative blurs */}
       <div className="absolute top-0 left-0 w-72 h-72 bg-blue-500 opacity-15 blur-3xl rounded-full -translate-x-1/3 -translate-y-1/3" />
       <div className="absolute bottom-0 right-0 w-72 h-72 bg-blue-500 opacity-10 blur-3xl rounded-full translate-x-1/3 translate-y-1/3" />
 
       <div className="relative max-w-md mx-auto text-center">
         {/* Badge */}
-        <div className="inline-flex items-center gap-1.5 bg-blue-500/15 text-blue-300 px-3 py-1.5 rounded-full text-xs font-medium mb-4 border border-blue-500/30">
+        <div className="inline-flex items-center gap-1.5 bg-blue-500/15 text-blue-300 px-3 py-1 rounded-full text-xs font-medium mb-3 border border-blue-500/30">
           <span>❤️</span>
           Ota-onangiz uchun sovg&apos;a
         </div>
 
         {/* Heading */}
-        <h1 className="text-2xl sm:text-3xl font-semibold leading-tight mb-6">
+        <h1 className="text-2xl sm:text-3xl font-semibold leading-tight mb-4">
           Masofadan turib
           <br />
           <span className="text-blue-400">OTA-ONANGIZNI</span>
@@ -160,8 +168,8 @@ export default function InternationalLeadForm() {
           xursand qiling
         </h1>
 
-        {/* DUMALOQ VIDEO (Telegram uslubi) - poster + preload bilan */}
-        <div className="flex justify-center mb-6">
+        {/* DUMALOQ VIDEO (Telegram uslubi) */}
+        <div className="flex justify-center mb-3">
           <div
             className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-full overflow-hidden shadow-2xl ring-4 ring-blue-500/30 cursor-pointer animate-pulse-ring"
             onClick={!isPlaying ? handlePlayVideo : undefined}
@@ -177,6 +185,7 @@ export default function InternationalLeadForm() {
               muted={!isPlaying}
               loop={!isPlaying}
               autoPlay={false}
+              onEnded={handleVideoEnded}
             />
 
             {/* Play tugmasi (faqat boshlanmaganda ko'rinadi) */}
@@ -193,15 +202,15 @@ export default function InternationalLeadForm() {
         </div>
 
         {/* Video ostida kichik matn */}
-        <p className="text-sm text-blue-200/80 mb-6">
+        <p className="text-sm text-blue-200/80 mb-4">
           Narx va yetkazib berish haqida 1 daqiqalik video
         </p>
 
         {/* Form Card */}
-        <div className="bg-white rounded-2xl p-5 sm:p-6 text-left shadow-2xl">
+        <div ref={formRef} className="bg-white rounded-2xl p-5 sm:p-6 text-left shadow-2xl">
           <form onSubmit={handleSubmit}>
             {/* Info box */}
-            <div className="bg-gradient-to-r from-blue-50 to-slate-50 border-l-2 border-blue-500 rounded-md p-3 mb-5 flex gap-2 items-start">
+            <div className="bg-gradient-to-r from-blue-50 to-slate-50 border-l-2 border-blue-500 rounded-md p-3 mb-4 flex gap-2 items-start">
               <span className="text-blue-500 text-base flex-shrink-0">ℹ️</span>
               <p className="text-xs text-slate-800 leading-snug m-0">
                 Ushbu formani diqqat bilan to&apos;ldiring va menejerlarimiz siz bilan bog&apos;lanib ma&apos;lumot berishadi
@@ -209,8 +218,8 @@ export default function InternationalLeadForm() {
             </div>
 
             {/* Name */}
-            <div className="mb-4">
-              <label className="block text-sm font-bold text-slate-900 mb-2">
+            <div className="mb-3">
+              <label className="block text-sm font-bold text-slate-900 mb-1.5">
                 Ismingiz
               </label>
               <input
@@ -225,8 +234,8 @@ export default function InternationalLeadForm() {
             </div>
 
             {/* Platform */}
-            <div className="mb-4">
-              <label className="block text-sm font-bold text-slate-900 mb-2">
+            <div className="mb-3">
+              <label className="block text-sm font-bold text-slate-900 mb-1.5">
                 Siz bilan qaysi platformada bog&apos;lansak bo&apos;ladi?
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
@@ -249,8 +258,8 @@ export default function InternationalLeadForm() {
             </div>
 
             {/* Contact value */}
-            <div className="mb-4">
-              <label className="block text-sm font-bold text-slate-900 mb-2">
+            <div className="mb-3">
+              <label className="block text-sm font-bold text-slate-900 mb-1.5">
                 {platformLabels[platform]}
               </label>
               <input
@@ -265,8 +274,8 @@ export default function InternationalLeadForm() {
             </div>
 
             {/* Country */}
-            <div className="mb-4">
-              <label className="block text-sm font-bold text-slate-900 mb-2">
+            <div className="mb-3">
+              <label className="block text-sm font-bold text-slate-900 mb-1.5">
                 Qaysi davlatdan murojaat qilyapsiz?
               </label>
               <input
@@ -281,8 +290,8 @@ export default function InternationalLeadForm() {
             </div>
 
             {/* Time */}
-            <div className="mb-5">
-              <label className="block text-sm font-bold text-slate-900 mb-2">
+            <div className="mb-4">
+              <label className="block text-sm font-bold text-slate-900 mb-1.5">
                 Siz bilan qaysi vaqtda bog&apos;lansak bo&apos;ladi?
               </label>
               <input
