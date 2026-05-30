@@ -169,7 +169,7 @@ export default function InternationalLeadForm() {
         </h1>
 
         {/* DUMALOQ VIDEO (Telegram uslubi) */}
-        <div className="flex justify-center mb-3">
+        <div className="flex justify-center mb-4">
           <div
             className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-full overflow-hidden shadow-2xl ring-4 ring-blue-500/30 cursor-pointer animate-pulse-ring"
             onClick={!isPlaying ? handlePlayVideo : undefined}
@@ -200,11 +200,6 @@ export default function InternationalLeadForm() {
             )}
           </div>
         </div>
-
-        {/* Video ostida kichik matn */}
-        <p className="text-sm text-blue-200/80 mb-4">
-          Narx va yetkazib berish haqida 1 daqiqalik video
-        </p>
 
         {/* Form Card */}
         <div ref={formRef} className="bg-white rounded-2xl p-5 sm:p-6 text-left shadow-2xl">
