@@ -29,6 +29,35 @@ const platformLabels: Record<Platform, string> = {
   Boshqa: "Username yoki raqamingiz",
 };
 
+// YORDAMCHI FUNKSIYA: Cookie'lardan fbp va fbc ni o'qish
+// Submit paytida chaqiriladi — Pixel cookie qo'yishga ulgurgan bo'ladi
+function getFbCookies(): { fbp: string; fbc: string } {
+  if (typeof document === "undefined") return { fbp: "", fbc: "" };
+
+  const cookies = document.cookie.split("; ").reduce((acc, cookie) => {
+    const [key, value] = cookie.split("=");
+    if (key && value) acc[key] = value;
+    return acc;
+  }, {} as Record<string, string>);
+
+  const fbp = cookies._fbp || "";
+
+  // FBC: avval URL'dan fbclid ni qaraymiz, keyin cookie
+  let fbc = "";
+  const urlParams = new URLSearchParams(window.location.search);
+  const fbclidFromUrl = urlParams.get("fbclid");
+
+  if (fbclidFromUrl) {
+    // URL'da fbclid bor — Meta formatida fbc yasaymiz
+    fbc = `fb.1.${Date.now()}.${fbclidFromUrl}`;
+  } else if (cookies._fbc) {
+    // URL'da yo'q — cookie'dan (o'zgartirishsiz)
+    fbc = cookies._fbc;
+  }
+
+  return { fbp, fbc };
+}
+
 export default function InternationalLeadForm() {
   const searchParams = useSearchParams();
   const productFromUrl = searchParams.get("product") || "";
@@ -40,9 +69,6 @@ export default function InternationalLeadForm() {
   const [time, setTime] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
-
-  const [fbp, setFbp] = useState<string>("");
-  const [fbc, setFbc] = useState<string>("");
 
   // Video uchun
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -62,36 +88,6 @@ export default function InternationalLeadForm() {
       formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-
-    // Cookie'larni o'qiymiz
-    const cookies = document.cookie.split("; ").reduce((acc, cookie) => {
-      const [key, value] = cookie.split("=");
-      if (key && value) acc[key] = value;
-      return acc;
-    }, {} as Record<string, string>);
-
-    // FBP — cookie'dan to'g'ridan-to'g'ri (o'zgartirishsiz)
-    setFbp(cookies._fbp || "");
-
-    // FBC — to'g'ri yo'l: avval URL'dan fbclid ni qaraymiz, keyin cookie
-    // MUHIM: fbclid katta-kichik harfga sezgir, o'zgartirishga ruxsat yo'q (Meta qoidasi)
-    const urlParams = new URLSearchParams(window.location.search);
-    const fbclidFromUrl = urlParams.get("fbclid");
-
-    if (fbclidFromUrl) {
-      // URL'da fbclid bor — Meta talab qilgan formatda fbc yasaymiz
-      // Format: fb.1.{timestamp_ms}.{fbclid} — fbclid AYNAN o'zgartirilmagan
-      const fbcValue = `fb.1.${Date.now()}.${fbclidFromUrl}`;
-      setFbc(fbcValue);
-    } else if (cookies._fbc) {
-      // URL'da yo'q — cookie'dan olamiz (o'zgartirishsiz)
-      setFbc(cookies._fbc);
-    }
-    // URL va cookie ikkalasida ham yo'q — fbc yubormaymiz (Meta talabi)
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,6 +119,10 @@ export default function InternationalLeadForm() {
     }
 
     try {
+      // YANGI: Cookie'larni AYNAN submit paytida o'qiymiz
+      // Bu vaqtga kelib Pixel _fbp va _fbc cookie'larni qo'yishga ulgurgan bo'ladi
+      const { fbp, fbc } = getFbCookies();
+
       const eventId = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
       if (typeof window !== "undefined") {
         window.localStorage.setItem("fb_lead_event_id", eventId);
