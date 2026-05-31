@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 
 // YORDAMCHI FUNKSIYA: Cookie'lardan fbp va fbc ni o'qish
-// Submit paytida chaqiriladi — Pixel cookie qo'yishga ulgurgan bo'ladi
 function getFbCookies(): { fbp: string; fbc: string } {
   if (typeof document === "undefined") return { fbp: "", fbc: "" };
 
@@ -22,10 +21,8 @@ function getFbCookies(): { fbp: string; fbc: string } {
   const fbclidFromUrl = urlParams.get("fbclid");
 
   if (fbclidFromUrl) {
-    // URL'da fbclid bor — Meta formatida fbc yasaymiz
     fbc = `fb.1.${Date.now()}.${fbclidFromUrl}`;
   } else if (cookies._fbc) {
-    // URL'da yo'q — cookie'dan (o'zgartirishsiz)
     fbc = cookies._fbc;
   }
 
@@ -41,6 +38,34 @@ export default function InternalLeadForm() {
   const [time, setTime] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // YANGI: fbp/fbc ni oldindan ushlab qo'yish uchun ref
+  const cachedFbpRef = useRef<string>("");
+  const cachedFbcRef = useRef<string>("");
+
+  // YANGI: Sahifa ochilgach Pixel cookie qo'yishini kutamiz va ushlaymiz
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const tryCapture = () => {
+      const { fbp, fbc } = getFbCookies();
+      if (fbp && !cachedFbpRef.current) cachedFbpRef.current = fbp;
+      if (fbc && !cachedFbcRef.current) cachedFbcRef.current = fbc;
+    };
+
+    tryCapture(); // 1-urinish: darrov
+
+    // 2, 3, 4 urinishlar — Pixel kech ulgursa ham olamiz
+    const timer1 = setTimeout(tryCapture, 500);
+    const timer2 = setTimeout(tryCapture, 1500);
+    const timer3 = setTimeout(tryCapture, 3000);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+    };
+  }, []);
 
   // Telefon raqamini formatlash: +998 __ ___ __ __
   const formatPhone = (value: string): string => {
@@ -84,9 +109,12 @@ export default function InternalLeadForm() {
     }
 
     try {
-      // YANGI: Cookie'larni AYNAN submit paytida o'qiymiz
-      // Bu vaqtga kelib Pixel _fbp va _fbc cookie'larni qo'yishga ulgurgan bo'ladi
-      const { fbp, fbc } = getFbCookies();
+      // YANGI MANTIQ: Submit paytida yana cookie o'qiymiz
+      const { fbp: fbpNow, fbc: fbcNow } = getFbCookies();
+
+      // Eng yaxshisini tanlaymiz: hozir bormi yoki oldin ushlangan
+      const finalFbp = fbpNow || cachedFbpRef.current || "";
+      const finalFbc = fbcNow || cachedFbcRef.current || "";
 
       const eventId = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
       if (typeof window !== "undefined") {
@@ -104,8 +132,8 @@ export default function InternalLeadForm() {
           bog_lanish_vaqti: time.trim(),
           product: productFromUrl,
           source: "zayavka",
-          fbp,
-          fbc,
+          fbp: finalFbp,
+          fbc: finalFbc,
           userAgent: navigator.userAgent,
           pageUrl: window.location.href,
           event_id: eventId,
