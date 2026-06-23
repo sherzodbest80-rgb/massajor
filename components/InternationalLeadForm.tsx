@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 
@@ -32,26 +31,20 @@ const platformLabels: Record<Platform, string> = {
 // YORDAMCHI FUNKSIYA: Cookie'lardan fbp va fbc ni o'qish
 function getFbCookies(): { fbp: string; fbc: string } {
   if (typeof document === "undefined") return { fbp: "", fbc: "" };
-
   const cookies = document.cookie.split("; ").reduce((acc, cookie) => {
     const [key, value] = cookie.split("=");
     if (key && value) acc[key] = value;
     return acc;
   }, {} as Record<string, string>);
-
   const fbp = cookies._fbp || "";
-
-  // FBC: avval URL'dan fbclid ni qaraymiz, keyin cookie
   let fbc = "";
   const urlParams = new URLSearchParams(window.location.search);
   const fbclidFromUrl = urlParams.get("fbclid");
-
   if (fbclidFromUrl) {
     fbc = `fb.1.${Date.now()}.${fbclidFromUrl}`;
   } else if (cookies._fbc) {
     fbc = cookies._fbc;
   }
-
   return { fbp, fbc };
 }
 
@@ -59,43 +52,37 @@ export default function InternationalLeadForm() {
   const searchParams = useSearchParams();
   const productFromUrl = searchParams.get("product") || "";
 
+  // Forma maydonlari
   const [name, setName] = useState("");
   const [platform, setPlatform] = useState<Platform>("Telegram");
   const [contactValue, setContactValue] = useState("");
   const [country, setCountry] = useState("");
   const [time, setTime] = useState("");
+
+  // Popup va qadam holati
+  const [isOpen, setIsOpen] = useState(false);
+  const [step, setStep] = useState(1);
+
+  // Submit holati
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // YANGI: fbp/fbc ni oldindan ushlab qo'yish uchun ref (state emas — qayta render bo'lmasin)
+  // fbp/fbc cache (qayta render qilmasligi uchun useRef)
   const cachedFbpRef = useRef<string>("");
   const cachedFbcRef = useRef<string>("");
 
-  // Video uchun
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const formRef = useRef<HTMLDivElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  // YANGI: Sahifa ochilgach Pixel cookie qo'yishini kutamiz va ushlaymiz
+  // Sahifa ochilgach Pixel cookie qo'yishini kutamiz va ushlaymiz (4x try)
   useEffect(() => {
     if (typeof window === "undefined") return;
-
-    // 1) Darrov sinab ko'ramiz (agar Pixel allaqachon ulgurgan bo'lsa)
     const tryCapture = () => {
       const { fbp, fbc } = getFbCookies();
       if (fbp && !cachedFbpRef.current) cachedFbpRef.current = fbp;
       if (fbc && !cachedFbcRef.current) cachedFbcRef.current = fbc;
     };
-
-    tryCapture(); // 1-urinish: sahifa ochilгач darrov
-
-    // 2-urinish: 500 ms keyin (Pixel odatda 200-400ms ichida qo'yadi)
+    tryCapture();
     const timer1 = setTimeout(tryCapture, 500);
-    // 3-urinish: 1500 ms keyin (sekin internet uchun)
     const timer2 = setTimeout(tryCapture, 1500);
-    // 4-urinish: 3000 ms keyin (juda sekin holatlar)
     const timer3 = setTimeout(tryCapture, 3000);
-
     return () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
@@ -103,58 +90,85 @@ export default function InternationalLeadForm() {
     };
   }, []);
 
-  const handlePlayVideo = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.muted = false;
-    video.play();
-    setIsPlaying(true);
+  // Popup ochilganda body scroll'ni to'xtatish
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+
+  const openPopup = () => {
+    setIsOpen(true);
+    setStep(1);
+    setErrorMsg("");
   };
 
-  const handleVideoEnded = () => {
-    if (formRef.current) {
-      formRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+  const closePopup = () => {
+    setIsOpen(false);
+    setErrorMsg("");
+  };
+
+  const goBack = () => {
+    setErrorMsg("");
+    if (step > 1) {
+      setStep(step - 1);
+    } else {
+      closePopup();
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatus("loading");
+  const goNext = () => {
     setErrorMsg("");
 
-    if (name.trim().length < 2) {
-      setStatus("error");
-      setErrorMsg("Iltimos, ismingizni kiriting");
-      return;
+    if (step === 1) {
+      if (name.trim().length < 2) {
+        setErrorMsg("Iltimos, ismingizni kiriting");
+        return;
+      }
+      setStep(2);
+    } else if (step === 3) {
+      if (contactValue.trim().length < 3) {
+        setErrorMsg("Iltimos, username yoki telefon raqamingizni kiriting");
+        return;
+      }
+      setStep(4);
+    } else if (step === 4) {
+      if (country.trim().length < 2) {
+        setErrorMsg("Iltimos, qaysi davlatdan ekanligingizni yozing");
+        return;
+      }
+      setStep(5);
     }
+  };
 
-    if (contactValue.trim().length < 3) {
-      setStatus("error");
-      setErrorMsg("Iltimos, username yoki telefon raqamingizni kiriting");
-      return;
-    }
+  // Platforma tanlanganda avtomatik keyingi qadamga o'tadi
+  const selectPlatform = (p: Platform) => {
+    setPlatform(p);
+    setContactValue(""); // yangi platforma — yangi format
+    setStep(3);
+  };
 
-    if (country.trim().length < 2) {
-      setStatus("error");
-      setErrorMsg("Iltimos, qaysi davlatdan ekanligingizni yozing");
-      return;
-    }
+  const handleSubmit = async () => {
+    setErrorMsg("");
 
     if (time.trim().length < 2) {
-      setStatus("error");
       setErrorMsg("Iltimos, qulay vaqtni kiriting");
       return;
     }
 
-    try {
-      // YANGI MANTIQ: Submit paytida yana cookie o'qiymiz
-      const { fbp: fbpNow, fbc: fbcNow } = getFbCookies();
+    setStatus("loading");
 
-      // Eng yaxshisini tanlaymiz: hozir bormi yoki oldin ushlangan
+    try {
+      const { fbp: fbpNow, fbc: fbcNow } = getFbCookies();
       const finalFbp = fbpNow || cachedFbpRef.current || "";
       const finalFbc = fbcNow || cachedFbcRef.current || "";
-
       const eventId = `lead_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
       if (typeof window !== "undefined") {
         window.localStorage.setItem("fb_lead_event_id", eventId);
         window.localStorage.setItem("lead_platform", platform);
@@ -193,199 +207,238 @@ export default function InternationalLeadForm() {
     }
   };
 
+  const totalSteps = 5;
+  const progress = (step / totalSteps) * 100;
+
   return (
-    <section className="min-h-screen bg-gradient-to-b from-[#042C53] to-[#021A33] text-white relative overflow-hidden py-6 px-5">
-      {/* Decorative blurs */}
-      <div className="absolute top-0 left-0 w-72 h-72 bg-blue-500 opacity-15 blur-3xl rounded-full -translate-x-1/3 -translate-y-1/3" />
-      <div className="absolute bottom-0 right-0 w-72 h-72 bg-blue-500 opacity-10 blur-3xl rounded-full translate-x-1/3 translate-y-1/3" />
+    <>
+      {/* ASOSIY SAHIFA — popup yopiq paytda */}
+      <section className="min-h-screen bg-white text-slate-900 py-10 px-5">
+        <div className="max-w-md mx-auto text-center">
+          {/* Badge */}
+          <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium mb-5 border border-blue-100">
+            <span>❤️</span>
+            Ota-onangiz uchun sovg&apos;a
+          </div>
 
-      <div className="relative max-w-md mx-auto text-center">
-        {/* Badge */}
-        <div className="inline-flex items-center gap-1.5 bg-blue-500/15 text-blue-300 px-3 py-1 rounded-full text-xs font-medium mb-3 border border-blue-500/30">
-          <span>❤️</span>
-          Ota-onangiz uchun sovg&apos;a
-        </div>
+          {/* Heading */}
+          <h1 className="text-3xl sm:text-4xl font-bold leading-tight mb-4 tracking-tight">
+            Masofadan turib
+            <br />
+            <span className="text-blue-600">OTA-ONANGIZNI</span>
+            <br />
+            xursand qiling
+          </h1>
 
-        {/* Heading */}
-        <h1 className="text-2xl sm:text-3xl font-semibold leading-tight mb-4">
-          Masofadan turib
-          <br />
-          <span className="text-blue-400">OTA-ONANGIZNI</span>
-          <br />
-          xursand qiling
-        </h1>
+          <p className="text-base text-slate-600 mb-8 leading-relaxed">
+            Massajor ota-onangizning oyoqlariga dam beradi. So&apos;rovingizni qoldiring — biz qarindoshlaringiz bilan bog&apos;lanib, mahsulotni yetkazib beramiz.
+          </p>
 
-        {/* DUMALOQ VIDEO (Telegram uslubi) */}
-        <div className="flex justify-center mb-4">
-          <div
-            className="relative w-56 h-56 sm:w-64 sm:h-64 rounded-full overflow-hidden shadow-2xl ring-4 ring-blue-500/30 cursor-pointer animate-pulse-ring"
-            onClick={!isPlaying ? handlePlayVideo : undefined}
+          {/* CTA Button */}
+          <button
+            onClick={openPopup}
+            className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-4 rounded-2xl text-base font-semibold transition-all shadow-lg shadow-blue-600/30"
           >
-            <video
-              ref={videoRef}
-              src="/konversiya.mp4"
-              poster="/poster.jpg"
-              className="w-full h-full object-cover"
-              playsInline
-              preload="auto"
-              controls={isPlaying}
-              muted={!isPlaying}
-              loop={!isPlaying}
-              autoPlay={false}
-              onEnded={handleVideoEnded}
-            />
+            Davom etish →
+          </button>
 
-            {/* Play tugmasi (faqat boshlanmaganda ko'rinadi) */}
-            {!isPlaying && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-[1px]">
-                <div className="w-20 h-20 rounded-full bg-white/95 flex items-center justify-center shadow-xl animate-pulse-btn">
-                  <svg className="w-10 h-10 text-blue-600 ml-1" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-              </div>
-            )}
+          {/* Trust signals */}
+          <div className="grid grid-cols-3 gap-3 mt-10">
+            <div className="text-center">
+              <div className="text-2xl mb-2">🚚</div>
+              <div className="text-xs text-slate-600 font-medium leading-snug">O&apos;zbekiston bo&apos;ylab BEPUL yetkazib berish</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl mb-2">💳</div>
+              <div className="text-xs text-slate-600 font-medium leading-snug">Qarindoshlaringiz to&apos;laydi</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl mb-2">✅</div>
+              <div className="text-xs text-slate-600 font-medium leading-snug">Sifat kafolati</div>
+            </div>
           </div>
         </div>
+      </section>
 
-        {/* Form Card */}
-        <div ref={formRef} className="bg-white rounded-2xl p-5 sm:p-6 text-left shadow-2xl">
-          <form onSubmit={handleSubmit}>
-            {/* Info box */}
-            <div className="bg-gradient-to-r from-blue-50 to-slate-50 border-l-2 border-blue-500 rounded-md p-3 mb-4 flex gap-2 items-start">
-              <span className="text-blue-500 text-base flex-shrink-0">ℹ️</span>
-              <p className="text-xs text-slate-800 leading-snug m-0">
-                Ushbu formani diqqat bilan to&apos;ldiring va menejerlarimiz siz bilan bog&apos;lanib ma&apos;lumot berishadi
-              </p>
-            </div>
-
-            {/* Name */}
-            <div className="mb-3">
-              <label className="block text-sm font-bold text-slate-900 mb-1.5">
-                Ismingiz
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Masalan: Akmal"
-                disabled={status === "loading"}
-                required
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
-              />
-            </div>
-
-            {/* Platform */}
-            <div className="mb-3">
-              <label className="block text-sm font-bold text-slate-900 mb-1.5">
-                Siz bilan qaysi platformada bog&apos;lansak bo&apos;ladi?
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                {platforms.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    onClick={() => setPlatform(p.value)}
-                    className={`px-2 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1 ${
-                      platform === p.value
-                        ? "bg-blue-500 text-white"
-                        : "bg-slate-50 text-slate-800 border border-slate-200 hover:border-blue-300"
-                    }`}
-                  >
-                    <span className="text-sm">{p.icon}</span>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Contact value */}
-            <div className="mb-3">
-              <label className="block text-sm font-bold text-slate-900 mb-1.5">
-                {platformLabels[platform]}
-              </label>
-              <input
-                type="text"
-                value={contactValue}
-                onChange={(e) => setContactValue(e.target.value)}
-                placeholder={platformPlaceholders[platform]}
-                disabled={status === "loading"}
-                required
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
-              />
-            </div>
-
-            {/* Country */}
-            <div className="mb-3">
-              <label className="block text-sm font-bold text-slate-900 mb-1.5">
-                Qaysi davlatdan murojaat qilyapsiz?
-              </label>
-              <input
-                type="text"
-                value={country}
-                onChange={(e) => setCountry(e.target.value)}
-                placeholder="Masalan: AQSh, Turkiya, Janubiy Koreya"
-                disabled={status === "loading"}
-                required
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
-              />
-            </div>
-
-            {/* Time */}
-            <div className="mb-4">
-              <label className="block text-sm font-bold text-slate-900 mb-1.5">
-                Siz bilan qaysi vaqtda bog&apos;lansak bo&apos;ladi?
-              </label>
-              <input
-                type="text"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                placeholder="Masalan: ertalab 9:00–11:00"
-                disabled={status === "loading"}
-                required
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
-              />
-            </div>
-
-            {/* Error */}
-            {status === "error" && errorMsg && (
-              <div className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md mb-3">
-                {errorMsg}
-              </div>
-            )}
-
-            {/* Submit */}
+      {/* MULTI-STEP POPUP */}
+      {isOpen && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in">
+          {/* Header: back + progress + close */}
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
             <button
-              type="submit"
-              disabled={status === "loading"}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              onClick={goBack}
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 active:bg-slate-200 text-slate-700 text-xl font-medium transition-colors"
+              aria-label="Orqaga"
             >
-              {status === "loading" ? "Yuborilmoqda..." : "So'rov yuborish →"}
+              ←
             </button>
-          </form>
+
+            {/* Progress bar */}
+            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-600 transition-all duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+
+            <button
+              onClick={closePopup}
+              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 active:bg-slate-200 text-slate-700 text-2xl leading-none transition-colors"
+              aria-label="Yopish"
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Body — qadamlar */}
+          <div className="flex-1 overflow-y-auto px-5 py-6">
+            <div className="max-w-md mx-auto">
+              <div className="text-xs text-slate-500 mb-3 font-semibold tracking-wide">
+                {step} / {totalSteps}
+              </div>
+
+              {/* QADAM 1: Ism */}
+              {step === 1 && (
+                <div className="animate-slide-in">
+                  <h2 className="text-2xl font-bold mb-2 text-slate-900">Ismingizni kiriting</h2>
+                  <p className="text-sm text-slate-600 mb-6">Sizga qanday murojaat qilishimiz mumkin?</p>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && goNext()}
+                    placeholder="Masalan: Akmal"
+                    autoFocus
+                    className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                  />
+                </div>
+              )}
+
+              {/* QADAM 2: Platforma (auto-advance) */}
+              {step === 2 && (
+                <div className="animate-slide-in">
+                  <h2 className="text-2xl font-bold mb-2 text-slate-900">Qaysi platformada bog&apos;lansak?</h2>
+                  <p className="text-sm text-slate-600 mb-6">Sizga qulay bo&apos;lgan platformani tanlang</p>
+                  <div className="flex flex-col gap-2.5">
+                    {platforms.map((p) => (
+                      <button
+                        key={p.value}
+                        type="button"
+                        onClick={() => selectPlatform(p.value)}
+                        className="flex items-center gap-3 bg-slate-50 hover:bg-blue-50 hover:border-blue-400 active:bg-blue-100 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-left transition-all"
+                      >
+                        <span className="text-2xl">{p.icon}</span>
+                        <span className="text-base font-medium text-slate-900">{p.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* QADAM 3: Contact value */}
+              {step === 3 && (
+                <div className="animate-slide-in">
+                  <h2 className="text-2xl font-bold mb-2 text-slate-900">{platformLabels[platform]}</h2>
+                  <p className="text-sm text-slate-600 mb-6">
+                    Tanlangan platforma: <span className="font-semibold text-blue-600">{platform}</span>
+                  </p>
+                  <input
+                    type="text"
+                    value={contactValue}
+                    onChange={(e) => setContactValue(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && goNext()}
+                    placeholder={platformPlaceholders[platform]}
+                    autoFocus
+                    className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                  />
+                </div>
+              )}
+
+              {/* QADAM 4: Davlat */}
+              {step === 4 && (
+                <div className="animate-slide-in">
+                  <h2 className="text-2xl font-bold mb-2 text-slate-900">Qaysi davlatdan?</h2>
+                  <p className="text-sm text-slate-600 mb-6">Siz hozir qaysi davlatda yashayapsiz?</p>
+                  <input
+                    type="text"
+                    value={country}
+                    onChange={(e) => setCountry(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && goNext()}
+                    placeholder="Masalan: AQSh, Turkiya, Janubiy Koreya"
+                    autoFocus
+                    className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                  />
+                </div>
+              )}
+
+              {/* QADAM 5: Vaqt */}
+              {step === 5 && (
+                <div className="animate-slide-in">
+                  <h2 className="text-2xl font-bold mb-2 text-slate-900">Qaysi vaqt qulay?</h2>
+                  <p className="text-sm text-slate-600 mb-6">Sizga qachon qo&apos;ng&apos;iroq qilaylik? (sizning vaqt mintaqangiz bo&apos;yicha)</p>
+                  <input
+                    type="text"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                    placeholder="Masalan: ertalab 9:00–11:00"
+                    autoFocus
+                    className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                  />
+                </div>
+              )}
+
+              {/* Xato xabari */}
+              {errorMsg && (
+                <div className="text-sm text-red-700 bg-red-50 border border-red-200 px-4 py-3 rounded-lg mt-4 font-medium">
+                  {errorMsg}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer: tugma (2-qadamdan tashqari hammasida) */}
+          {step !== 2 && (
+            <div className="px-5 py-4 border-t border-slate-100 bg-white">
+              <div className="max-w-md mx-auto">
+                {step < 5 ? (
+                  <button
+                    onClick={goNext}
+                    className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-3.5 rounded-xl text-base font-semibold transition-colors"
+                  >
+                    Keyingisi →
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={status === "loading"}
+                    className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-3.5 rounded-xl text-base font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {status === "loading" ? "Yuborilmoqda..." : "So'rov yuborish →"}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       <style jsx>{`
-        @keyframes pulse-ring {
-          0%, 100% {
-            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
-          }
-          50% {
-            box-shadow: 0 0 0 12px rgba(59, 130, 246, 0);
-          }
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-        .animate-pulse-ring {
-          animation: pulse-ring 2s ease-in-out infinite;
+        .animate-fade-in {
+          animation: fade-in 0.25s ease-out;
         }
-        @keyframes pulse-btn {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
+        @keyframes slide-in {
+          from { opacity: 0; transform: translateX(20px); }
+          to { opacity: 1; transform: translateX(0); }
         }
-        .animate-pulse-btn {
-          animation: pulse-btn 1.5s ease-in-out infinite;
+        .animate-slide-in {
+          animation: slide-in 0.3s ease-out;
         }
       `}</style>
-    </section>
+    </>
   );
 }
