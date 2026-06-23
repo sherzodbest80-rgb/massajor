@@ -59,8 +59,7 @@ export default function InternationalLeadForm() {
   const [country, setCountry] = useState("");
   const [time, setTime] = useState("");
 
-  // Popup va qadam holati
-  const [isOpen, setIsOpen] = useState(false);
+  // Qadam holati (forma darrov ochiq — lending ekrani yo'q)
   const [step, setStep] = useState(1);
 
   // Submit holati
@@ -90,36 +89,20 @@ export default function InternationalLeadForm() {
     };
   }, []);
 
-  // Popup ochilganda body scroll'ni to'xtatish
+  // Forma butun ekranni egallaydi — body scroll'ni to'xtatamiz
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isOpen]);
-
-  const openPopup = () => {
-    setIsOpen(true);
-    setStep(1);
-    setErrorMsg("");
-  };
-
-  const closePopup = () => {
-    setIsOpen(false);
-    setErrorMsg("");
-  };
+  }, []);
 
   const goBack = () => {
     setErrorMsg("");
     if (step > 1) {
       setStep(step - 1);
-    } else {
-      closePopup();
     }
+    // 1-qadamda orqaga qaytadigan joy yo'q
   };
 
   const goNext = () => {
@@ -211,215 +194,161 @@ export default function InternationalLeadForm() {
   const progress = (step / totalSteps) * 100;
 
   return (
-    <>
-      {/* ASOSIY SAHIFA — popup yopiq paytda */}
-      <section className="min-h-screen bg-white text-slate-900 py-10 px-5">
-        <div className="max-w-md mx-auto text-center">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-xs font-medium mb-5 border border-blue-100">
-            <span>❤️</span>
-            Ota-onangiz uchun sovg&apos;a
-          </div>
-
-          {/* Heading */}
-          <h1 className="text-3xl sm:text-4xl font-bold leading-tight mb-4 tracking-tight">
-            Masofadan turib
-            <br />
-            <span className="text-blue-600">OTA-ONANGIZNI</span>
-            <br />
-            xursand qiling
-          </h1>
-
-          <p className="text-base text-slate-600 mb-8 leading-relaxed">
-            Massajor ota-onangizning oyoqlariga dam beradi. So&apos;rovingizni qoldiring — biz qarindoshlaringiz bilan bog&apos;lanib, mahsulotni yetkazib beramiz.
-          </p>
-
-          {/* CTA Button */}
+    <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in">
+      {/* Header: back + progress */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
+        {step > 1 ? (
           <button
-            onClick={openPopup}
-            className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-4 rounded-2xl text-base font-semibold transition-all shadow-lg shadow-blue-600/30"
+            onClick={goBack}
+            className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 active:bg-slate-200 text-slate-700 text-xl font-medium transition-colors"
+            aria-label="Orqaga"
           >
-            Davom etish →
+            ←
           </button>
+        ) : (
+          <div className="w-10 h-10" aria-hidden="true" />
+        )}
 
-          {/* Trust signals */}
-          <div className="grid grid-cols-3 gap-3 mt-10">
-            <div className="text-center">
-              <div className="text-2xl mb-2">🚚</div>
-              <div className="text-xs text-slate-600 font-medium leading-snug">O&apos;zbekiston bo&apos;ylab BEPUL yetkazib berish</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl mb-2">💳</div>
-              <div className="text-xs text-slate-600 font-medium leading-snug">Qarindoshlaringiz to&apos;laydi</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl mb-2">✅</div>
-              <div className="text-xs text-slate-600 font-medium leading-snug">Sifat kafolati</div>
-            </div>
-          </div>
+        {/* Progress bar */}
+        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-blue-600 transition-all duration-300 ease-out"
+            style={{ width: `${progress}%` }}
+          />
         </div>
-      </section>
 
-      {/* MULTI-STEP POPUP */}
-      {isOpen && (
-        <div className="fixed inset-0 z-50 bg-white flex flex-col animate-fade-in">
-          {/* Header: back + progress + close */}
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
-            <button
-              onClick={goBack}
-              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 active:bg-slate-200 text-slate-700 text-xl font-medium transition-colors"
-              aria-label="Orqaga"
-            >
-              ←
-            </button>
+        {/* O'ng tomonni balanslash uchun bo'sh joy */}
+        <div className="w-10 h-10" aria-hidden="true" />
+      </div>
 
-            {/* Progress bar */}
-            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-blue-600 transition-all duration-300 ease-out"
-                style={{ width: `${progress}%` }}
+      {/* Body — qadamlar */}
+      <div className="flex-1 overflow-y-auto px-5 py-6">
+        <div className="max-w-md mx-auto">
+          <div className="text-xs text-slate-500 mb-3 font-semibold tracking-wide">
+            {step} / {totalSteps}
+          </div>
+
+          {/* QADAM 1: Ism */}
+          {step === 1 && (
+            <div className="animate-slide-in">
+              <h2 className="text-2xl font-bold mb-2 text-slate-900">Ismingizni kiriting</h2>
+              <p className="text-sm text-slate-600 mb-6">Sizga qanday murojaat qilishimiz mumkin?</p>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && goNext()}
+                placeholder="Masalan: Akmal"
+                autoFocus
+                className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
               />
             </div>
+          )}
 
-            <button
-              onClick={closePopup}
-              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 active:bg-slate-200 text-slate-700 text-2xl leading-none transition-colors"
-              aria-label="Yopish"
-            >
-              ×
-            </button>
-          </div>
-
-          {/* Body — qadamlar */}
-          <div className="flex-1 overflow-y-auto px-5 py-6">
-            <div className="max-w-md mx-auto">
-              <div className="text-xs text-slate-500 mb-3 font-semibold tracking-wide">
-                {step} / {totalSteps}
-              </div>
-
-              {/* QADAM 1: Ism */}
-              {step === 1 && (
-                <div className="animate-slide-in">
-                  <h2 className="text-2xl font-bold mb-2 text-slate-900">Ismingizni kiriting</h2>
-                  <p className="text-sm text-slate-600 mb-6">Sizga qanday murojaat qilishimiz mumkin?</p>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && goNext()}
-                    placeholder="Masalan: Akmal"
-                    autoFocus
-                    className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
-                  />
-                </div>
-              )}
-
-              {/* QADAM 2: Platforma (auto-advance) */}
-              {step === 2 && (
-                <div className="animate-slide-in">
-                  <h2 className="text-2xl font-bold mb-2 text-slate-900">Qaysi platformada bog&apos;lansak?</h2>
-                  <p className="text-sm text-slate-600 mb-6">Sizga qulay bo&apos;lgan platformani tanlang</p>
-                  <div className="flex flex-col gap-2.5">
-                    {platforms.map((p) => (
-                      <button
-                        key={p.value}
-                        type="button"
-                        onClick={() => selectPlatform(p.value)}
-                        className="flex items-center gap-3 bg-slate-50 hover:bg-blue-50 hover:border-blue-400 active:bg-blue-100 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-left transition-all"
-                      >
-                        <span className="text-2xl">{p.icon}</span>
-                        <span className="text-base font-medium text-slate-900">{p.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* QADAM 3: Contact value */}
-              {step === 3 && (
-                <div className="animate-slide-in">
-                  <h2 className="text-2xl font-bold mb-2 text-slate-900">{platformLabels[platform]}</h2>
-                  <p className="text-sm text-slate-600 mb-6">
-                    Tanlangan platforma: <span className="font-semibold text-blue-600">{platform}</span>
-                  </p>
-                  <input
-                    type="text"
-                    value={contactValue}
-                    onChange={(e) => setContactValue(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && goNext()}
-                    placeholder={platformPlaceholders[platform]}
-                    autoFocus
-                    className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
-                  />
-                </div>
-              )}
-
-              {/* QADAM 4: Davlat */}
-              {step === 4 && (
-                <div className="animate-slide-in">
-                  <h2 className="text-2xl font-bold mb-2 text-slate-900">Qaysi davlatdan?</h2>
-                  <p className="text-sm text-slate-600 mb-6">Siz hozir qaysi davlatda yashayapsiz?</p>
-                  <input
-                    type="text"
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && goNext()}
-                    placeholder="Masalan: AQSh, Turkiya, Janubiy Koreya"
-                    autoFocus
-                    className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
-                  />
-                </div>
-              )}
-
-              {/* QADAM 5: Vaqt */}
-              {step === 5 && (
-                <div className="animate-slide-in">
-                  <h2 className="text-2xl font-bold mb-2 text-slate-900">Qaysi vaqt qulay?</h2>
-                  <p className="text-sm text-slate-600 mb-6">Sizga qachon qo&apos;ng&apos;iroq qilaylik? (sizning vaqt mintaqangiz bo&apos;yicha)</p>
-                  <input
-                    type="text"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                    placeholder="Masalan: ertalab 9:00–11:00"
-                    autoFocus
-                    className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
-                  />
-                </div>
-              )}
-
-              {/* Xato xabari */}
-              {errorMsg && (
-                <div className="text-sm text-red-700 bg-red-50 border border-red-200 px-4 py-3 rounded-lg mt-4 font-medium">
-                  {errorMsg}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Footer: tugma (2-qadamdan tashqari hammasida) */}
-          {step !== 2 && (
-            <div className="px-5 py-4 border-t border-slate-100 bg-white">
-              <div className="max-w-md mx-auto">
-                {step < 5 ? (
+          {/* QADAM 2: Platforma (auto-advance) */}
+          {step === 2 && (
+            <div className="animate-slide-in">
+              <h2 className="text-2xl font-bold mb-2 text-slate-900">Qaysi platformada bog&apos;lansak?</h2>
+              <p className="text-sm text-slate-600 mb-6">Sizga qulay bo&apos;lgan platformani tanlang</p>
+              <div className="flex flex-col gap-2.5">
+                {platforms.map((p) => (
                   <button
-                    onClick={goNext}
-                    className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-3.5 rounded-xl text-base font-semibold transition-colors"
+                    key={p.value}
+                    type="button"
+                    onClick={() => selectPlatform(p.value)}
+                    className="flex items-center gap-3 bg-slate-50 hover:bg-blue-50 hover:border-blue-400 active:bg-blue-100 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-left transition-all"
                   >
-                    Keyingisi →
+                    <span className="text-2xl">{p.icon}</span>
+                    <span className="text-base font-medium text-slate-900">{p.label}</span>
                   </button>
-                ) : (
-                  <button
-                    onClick={handleSubmit}
-                    disabled={status === "loading"}
-                    className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-3.5 rounded-xl text-base font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {status === "loading" ? "Yuborilmoqda..." : "So'rov yuborish →"}
-                  </button>
-                )}
+                ))}
               </div>
             </div>
           )}
+
+          {/* QADAM 3: Contact value */}
+          {step === 3 && (
+            <div className="animate-slide-in">
+              <h2 className="text-2xl font-bold mb-2 text-slate-900">{platformLabels[platform]}</h2>
+              <p className="text-sm text-slate-600 mb-6">
+                Tanlangan platforma: <span className="font-semibold text-blue-600">{platform}</span>
+              </p>
+              <input
+                type="text"
+                value={contactValue}
+                onChange={(e) => setContactValue(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && goNext()}
+                placeholder={platformPlaceholders[platform]}
+                autoFocus
+                className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+              />
+            </div>
+          )}
+
+          {/* QADAM 4: Davlat */}
+          {step === 4 && (
+            <div className="animate-slide-in">
+              <h2 className="text-2xl font-bold mb-2 text-slate-900">Qaysi davlatdan?</h2>
+              <p className="text-sm text-slate-600 mb-6">Siz hozir qaysi davlatda yashayapsiz?</p>
+              <input
+                type="text"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && goNext()}
+                placeholder="Masalan: AQSh, Turkiya, Janubiy Koreya"
+                autoFocus
+                className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+              />
+            </div>
+          )}
+
+          {/* QADAM 5: Vaqt */}
+          {step === 5 && (
+            <div className="animate-slide-in">
+              <h2 className="text-2xl font-bold mb-2 text-slate-900">Qaysi vaqt qulay?</h2>
+              <p className="text-sm text-slate-600 mb-6">Sizga qachon qo&apos;ng&apos;iroq qilaylik? (sizning vaqt mintaqangiz bo&apos;yicha)</p>
+              <input
+                type="text"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+                placeholder="Masalan: ertalab 9:00–11:00"
+                autoFocus
+                className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+              />
+            </div>
+          )}
+
+          {/* Xato xabari */}
+          {errorMsg && (
+            <div className="text-sm text-red-700 bg-red-50 border border-red-200 px-4 py-3 rounded-lg mt-4 font-medium">
+              {errorMsg}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer: tugma (2-qadamdan tashqari hammasida) */}
+      {step !== 2 && (
+        <div className="px-5 py-4 border-t border-slate-100 bg-white">
+          <div className="max-w-md mx-auto">
+            {step < 5 ? (
+              <button
+                onClick={goNext}
+                className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-3.5 rounded-xl text-base font-semibold transition-colors"
+              >
+                Keyingisi →
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmit}
+                disabled={status === "loading"}
+                className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white py-3.5 rounded-xl text-base font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {status === "loading" ? "Yuborilmoqda..." : "So'rov yuborish →"}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -439,6 +368,6 @@ export default function InternationalLeadForm() {
           animation: slide-in 0.3s ease-out;
         }
       `}</style>
-    </>
+    </div>
   );
 }
