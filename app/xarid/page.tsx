@@ -39,22 +39,23 @@ export default function XaridPage() {
   };
 
   return (
-    <section className="min-h-screen bg-gradient-to-b from-[#F4F8FC] to-white py-10 px-5">
-      <div className="max-w-md mx-auto text-center">
+    <section className="min-h-screen bg-gradient-to-b from-[#F4F8FC] to-white px-5 py-6 flex flex-col justify-center">
+      <div className="max-w-md mx-auto text-center w-full">
         {/* Badge */}
-        <div className="inline-flex items-center gap-1.5 bg-blue-100 text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium mb-5">
+        <div className="inline-flex items-center gap-1.5 bg-blue-100 text-blue-600 px-3 py-1.5 rounded-full text-xs font-medium mb-4">
           <span>🛡️</span>
           O&apos;zbekiston bo&apos;ylab BEPUL yetkazib berish
         </div>
 
-        {/* Mahsulot rasmi — yaxshiroq rasm bo'lsa, /public ga tashlab
-            src qiymatini o'zgartiring (masalan "/massajor.jpg") */}
-        <div className="rounded-2xl overflow-hidden border border-slate-100 shadow-lg shadow-slate-200/50 mb-6">
+        {/* Mahsulot rasmi — kichraytirilib markazga joylandi.
+            Kattaroq/kichikroq qilish uchun max-h qiymatini o'zgartiring
+            (masalan max-h-[35vh] → max-h-[28vh]) */}
+        <div className="flex justify-center mb-5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/massajor.jpg"
             alt="Oyoq massajori"
-            className="w-full h-auto object-cover"
+            className="max-h-[34vh] w-auto object-contain rounded-2xl border border-slate-100 shadow-lg shadow-slate-200/50"
           />
         </div>
 
@@ -65,7 +66,7 @@ export default function XaridPage() {
           <span className="text-blue-600">1 600 000 so&apos;mdan</span> boshlanadi
         </h1>
 
-        <p className="text-base text-slate-600 mb-8">
+        <p className="text-base text-slate-600 mb-5">
           Xarid qilmoqchi bo&apos;lsangiz, quyidagi raqamga qo&apos;ng&apos;iroq qiling:
         </p>
 
@@ -84,7 +85,7 @@ export default function XaridPage() {
         </p>
 
         {/* Ishonch belgilari */}
-        <div className="grid grid-cols-3 gap-3 mt-10">
+        <div className="grid grid-cols-3 gap-3 mt-8">
           <div className="text-center">
             <div className="text-2xl mb-2">🚚</div>
             <div className="text-xs text-slate-600 font-medium leading-snug">
