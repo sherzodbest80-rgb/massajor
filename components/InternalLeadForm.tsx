@@ -215,6 +215,24 @@ export default function InternalLeadForm() {
                 required
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60"
               />
+
+              {/* IIB ogohlantirish */}
+              <div className="mt-2 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-md p-2.5">
+                <img
+                  src="/iib-logo.jpg"
+                  alt="O'zbekiston Respublikasi Ichki ishlar vazirligi"
+                  className="w-9 h-9 flex-shrink-0 object-contain mt-0.5"
+                />
+                <p className="text-[11px] leading-snug text-amber-900 m-0">
+                  <span className="font-semibold">Diqqat!</span> Boshqa
+                  shaxsning telefon raqamini uning roziligisiz kiritish{" "}
+                  <span className="font-semibold">
+                    MJtK 183-moddasiga
+                  </span>{" "}
+                  ko&apos;ra javobgarlikka sabab bo&apos;ladi. Iltimos, faqat
+                  o&apos;z raqamingizni yozing.
+                </p>
+              </div>
             </div>
 
             {/* 3. Vaqt */}
