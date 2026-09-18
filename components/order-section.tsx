@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { getAttribution } from "@/lib/attribution";
 import { useRouter } from "next/navigation";
 
 const VILOYATLAR = [
@@ -56,6 +57,7 @@ export function OrderSection() {
           fbc: getCookie("_fbc"),
           userAgent: navigator.userAgent,
           pageUrl: window.location.href,
+          attribution: getAttribution(),
         }),
       });
 

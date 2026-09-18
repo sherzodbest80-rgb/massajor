@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { getAttribution } from "@/lib/attribution";
 import { useSearchParams } from "next/navigation";
 
 // YORDAMCHI FUNKSIYA: Cookie'lardan fbp va fbc ni o'qish
@@ -158,6 +159,7 @@ export default function InternalLeadForm() {
           userAgent: navigator.userAgent,
           pageUrl: window.location.href,
           event_id: eventId,
+          attribution: getAttribution(),
         }),
       });
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
+import { AttributionCapture } from "@/components/AttributionCapture";
 
 export const metadata: Metadata = {
   title: "Massajor",
@@ -15,6 +16,7 @@ export default function RootLayout({
   return (
     <html lang="uz">
       <body>
+        <AttributionCapture />
         {children}
 
         {/* Meta Pixel Code */}

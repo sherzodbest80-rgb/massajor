@@ -20,6 +20,8 @@ interface LeadPayload {
   source?: string;
   // YANGI: Pixel bilan deduplikatsiya uchun
   event_id?: string;
+  // Reklama manbasi (UTM + FB ad_id), lib/attribution.ts dan
+  attribution?: Record<string, string | number | undefined>;
 }
 
 // Viloyat nomi → amoCRM enum_id mapping
@@ -55,6 +57,26 @@ const VILOYAT_TO_CITY: Record<string, string> = {
 };
 
 const VILOYAT_FIELD_ID = 316123;
+// amoCRM lid maydoni "FB Ad ID" (marketing nazorat tizimi, 18.09.2026)
+const FB_AD_ID_FIELD_ID = 1029159;
+const UTM_CODES: Record<string, string> = {
+  utm_source: "UTM_SOURCE",
+  utm_medium: "UTM_MEDIUM",
+  utm_campaign: "UTM_CAMPAIGN",
+  utm_term: "UTM_TERM",
+  utm_content: "UTM_CONTENT",
+};
+
+function cleanAttribution(a: LeadPayload["attribution"]): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!a || typeof a !== "object") return out;
+  for (const k of [...Object.keys(UTM_CODES), "ad_id", "landing"]) {
+    const v = a[k];
+    if (v !== undefined && v !== null && String(v).trim()) out[k] = String(v).trim().slice(0, 250);
+  }
+  if (out.ad_id && !/^\d{5,25}$/.test(out.ad_id)) delete out.ad_id;
+  return out;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -77,6 +99,12 @@ export async function POST(req: NextRequest) {
       source,
       event_id, // YANGI: brauzerdan keladi (Pixel bilan dedup uchun)
     } = body;
+    const attribution = cleanAttribution(body.attribution);
+
+    // SINOV REJIMI: to'g'ri kalit bilan kelgan so'rov Meta'ga event yubormaydi va
+    // Telegram xabari menejerlar guruhiga emas, TELEGRAM_TEST_CHAT_ID ga boradi.
+    const isTest =
+      !!process.env.LEAD_TEST_KEY && req.headers.get("x-lead-test-key") === process.env.LEAD_TEST_KEY;
 
     if (!name || !phone) {
       return NextResponse.json({ error: "Ism va telefon majburiy" }, { status: 400 });
@@ -122,6 +150,7 @@ export async function POST(req: NextRequest) {
         fbc,
         clientIp,
         userAgent: userAgent || "",
+        attribution,
       });
     } catch (amoErr: any) {
       console.error("[AMOCRM XATO]", amoErr.message);
@@ -131,6 +160,7 @@ export async function POST(req: NextRequest) {
     // 2-QADAM: Meta'ga yuborish
     let metaResult: any = null;
     try {
+      if (isTest) throw new Error("sinov rejimi: Meta'ga yuborilmadi");
       metaResult = await sendToMetaCAPI({
         name,
         phone,
@@ -161,6 +191,8 @@ export async function POST(req: NextRequest) {
         product,
         source: source || "noma'lum",
         amoLeadId: amoResult?.leadId,
+        attribution,
+        chatId: isTest ? process.env.TELEGRAM_TEST_CHAT_ID : undefined,
       });
     } catch (tgErr: any) {
       console.error("[TELEGRAM XATO]", tgErr.message);
@@ -192,9 +224,11 @@ async function sendToTelegram(data: {
   product?: string;
   source: string;
   amoLeadId?: number;
+  attribution?: Record<string, string>;
+  chatId?: string;
 }) {
   const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  const CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+  const CHAT_ID = data.chatId || process.env.TELEGRAM_CHAT_ID;
 
   if (!BOT_TOKEN || !CHAT_ID) {
     console.warn("[TELEGRAM] credentials yo'q, o'tkazib yuborildi");
@@ -232,6 +266,14 @@ async function sendToTelegram(data: {
 
   lines.push(``);
   lines.push(`🔗 <b>Manba:</b> ${sourceLabel}`);
+
+  if (data.attribution?.utm_campaign || data.attribution?.utm_content) {
+    lines.push(
+      `📣 <b>Reklama:</b> ${escapeHtml(
+        [data.attribution.utm_campaign, data.attribution.utm_content].filter(Boolean).join(" / ")
+      )}`
+    );
+  }
 
   if (data.amoLeadId) {
     lines.push(`🆔 <b>AmoCRM ID:</b> ${data.amoLeadId}`);
@@ -376,6 +418,7 @@ async function createAmoCRMLead(data: {
   fbc?: string;
   clientIp?: string;
   userAgent?: string;
+  attribution?: Record<string, string>;
 }) {
   const DOMAIN = process.env.AMOCRM_DOMAIN;
   const ACCESS_TOKEN = process.env.AMOCRM_ACCESS_TOKEN;
@@ -442,6 +485,14 @@ async function createAmoCRMLead(data: {
     });
   }
 
+  const attr = data.attribution || {};
+  for (const [k, code] of Object.entries(UTM_CODES)) {
+    if (attr[k]) leadCustomFields.push({ field_code: code, values: [{ value: attr[k] }] });
+  }
+  if (attr.ad_id) {
+    leadCustomFields.push({ field_id: FB_AD_ID_FIELD_ID, values: [{ value: attr.ad_id }] });
+  }
+
   const unsortedPayload = [{
     source_name: "Website",
     source_uid: `web_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -491,6 +542,9 @@ async function createAmoCRMLead(data: {
         `Mijoz: ${data.name}`,
         `Telefon: ${data.phone}`,
         data.viloyat ? `Viloyat: ${data.viloyat}` : "",
+        attr.utm_campaign || attr.utm_content
+          ? `Reklama: ${[attr.utm_campaign, attr.utm_term, attr.utm_content].filter(Boolean).join(" / ")}`
+          : "",
         data.comment ? `\n${data.comment}` : "",
       ].filter(Boolean).join("\n");
 
