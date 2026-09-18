@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { getAttribution } from "@/lib/attribution";
 import { useSearchParams } from "next/navigation";
 
 type Platform = "Telegram" | "WhatsApp" | "KakaoTalk" | "IMO" | "Boshqa";
@@ -174,6 +175,7 @@ export default function InternationalLeadForm() {
           userAgent: navigator.userAgent,
           pageUrl: window.location.href,
           event_id: eventId,
+          attribution: getAttribution(),
         }),
       });
 
