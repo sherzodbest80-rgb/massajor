@@ -32,6 +32,39 @@ const VILOYAT_TO_CITY: Record<string, string> = {
 
 const VILOYAT_FIELD_ID = "316123";
 
+// Sotuvda qaysi mahsulot ekanini aniqlash uchun kerak bo'ladigan maydonlar
+const UTM_CAMPAIGN_FIELD_ID = "315795";
+const NIMA_SOTILDI_FIELD_ID = "1023441"; // menejer to'ldiradigan select
+
+type ProductInfo = { name: string; slug: string; url: string };
+
+const PRODUCTS: Array<{ match: RegExp; product: ProductInfo }> = [
+  { match: /\[\s*SPA\s*vanna\s*\]|oyoq\s*spa|oyoqspa/i,
+    product: { name: "Oyoq SPA vannasi", slug: "oyoq-spa", url: "https://oyoqspa.vercel.app/" } },
+  { match: /\[\s*HADIYA\s*\]|hadiya/i,
+    product: { name: "HADIYA massaj to'plami", slug: "hadiya", url: "https://hadiya-ruby.vercel.app/" } },
+  { match: /\[\s*VODOROD\s*\]|vodorod/i,
+    product: { name: "Vodorodli suv to'plami", slug: "vodorod", url: "https://vodorod.vercel.app/" } },
+];
+
+const DEFAULT_PRODUCT: ProductInfo = {
+  name: "Oyoq massajori",
+  slug: "massajor",
+  url: process.env.NEXT_PUBLIC_SITE_URL || "https://massajor.uz",
+};
+
+// Mahsulot nomini uch manbadan qidiramiz: lid nomi -> "Nima sotildi" -> utm_campaign.
+// Hech biri mos kelmasa, sayt o'zining asosiy mahsuloti (oyoq massajori) deb hisoblaymiz.
+function resolveProduct(sources: Array<string | undefined>): ProductInfo {
+  for (const raw of sources) {
+    if (!raw) continue;
+    for (const { match, product } of PRODUCTS) {
+      if (match.test(raw)) return product;
+    }
+  }
+  return DEFAULT_PRODUCT;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -85,6 +118,7 @@ export async function POST(req: NextRequest) {
       clientIp: leadInfo.clientIp,
       clientUserAgent: leadInfo.clientUserAgent,
       price: finalPrice,
+      product: resolveProduct([leadInfo.leadName, leadInfo.nimaSotildi, leadInfo.utmCampaign]),
     });
 
     return NextResponse.json({ ok: true, meta: result });
@@ -125,6 +159,8 @@ async function fetchLeadDetails(leadId: string) {
     let clientIp = "";
     let clientUserAgent = "";
     let city = "";
+    let utmCampaign = "";
+    let nimaSotildi = "";
 
     for (const field of lead.custom_fields_values || []) {
       const fid = String(field.field_id);
@@ -145,6 +181,12 @@ async function fetchLeadDetails(leadId: string) {
       if (fid === VILOYAT_FIELD_ID) {
         const enumId = String(field.values?.[0]?.enum_id || "");
         city = VILOYAT_TO_CITY[enumId] || "";
+      }
+      if (fid === UTM_CAMPAIGN_FIELD_ID) {
+        utmCampaign = field.values?.[0]?.value || "";
+      }
+      if (fid === NIMA_SOTILDI_FIELD_ID) {
+        nimaSotildi = field.values?.[0]?.value || "";
       }
     }
 
@@ -180,6 +222,9 @@ async function fetchLeadDetails(leadId: string) {
       clientIp,
       clientUserAgent,
       price: lead.price || 0,
+      leadName: lead.name || "",
+      utmCampaign,
+      nimaSotildi,
     };
   } catch (err) {
     console.error("[AMO FETCH LEAD]", err);
@@ -198,6 +243,7 @@ async function sendPurchaseToMeta(data: {
   fbc: string;
   clientIp: string;
   clientUserAgent: string;
+  product: ProductInfo;
   price: number;
 }) {
   const PIXEL_ID = process.env.META_PIXEL_ID;
@@ -249,12 +295,16 @@ async function sendPurchaseToMeta(data: {
       event_name: "Purchase",
       event_time: Math.floor(Date.now() / 1000),
       event_id: `purchase_${data.leadId}`, // deduplikatsiya
-      event_source_url: process.env.NEXT_PUBLIC_SITE_URL || "https://massajor.uz",
+      event_source_url: data.product.url,
       action_source: "website",
       user_data: userData,
       custom_data: {
         currency: "UZS",
         value: data.price,
+        // Qaysi mahsulot sotilgani — Meta shu maydon bo'yicha mahsulot
+        // custom conversion'ini taniydi (lid hodisasidagi bilan bir xil nom)
+        content_name: data.product.name,
+        content_category: data.product.slug,
       },
     }],
     ...(process.env.META_TEST_EVENT_CODE
