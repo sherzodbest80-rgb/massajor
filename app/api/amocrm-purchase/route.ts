@@ -39,7 +39,7 @@ const NIMA_SOTILDI_FIELD_ID = "1023441"; // menejer to'ldiradigan select
 type ProductInfo = { name: string; slug: string; url: string };
 
 const PRODUCTS: Array<{ match: RegExp; product: ProductInfo }> = [
-  { match: /\[\s*SPA\s*vanna\s*\]|oyoq\s*spa|oyoqspa/i,
+  { match: /\[\s*SPA\s*vanna\s*\]|oyoq\s*spa|oyoqspa|\bSPA\b/i,
     product: { name: "Oyoq SPA vannasi", slug: "oyoq-spa", url: "https://oyoqspa.vercel.app/" } },
   { match: /\[\s*HADIYA\s*\]|hadiya/i,
     product: { name: "HADIYA massaj to'plami", slug: "hadiya", url: "https://hadiya-ruby.vercel.app/" } },
