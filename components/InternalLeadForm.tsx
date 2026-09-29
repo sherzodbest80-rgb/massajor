@@ -231,7 +231,7 @@ export default function InternalLeadForm() {
             </div>
           )}
 
-          {/* QADAM 2: Telefon + IIB ogohlantirish */}
+          {/* QADAM 2: Telefon */}
           {step === 2 && (
             <div className="animate-slide-in">
               <h2 className="text-2xl font-bold mb-2 text-slate-900">Telefon raqamingiz</h2>
@@ -247,22 +247,6 @@ export default function InternalLeadForm() {
                 autoFocus
                 className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3.5 text-base text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
               />
-
-              {/* IIB ogohlantirish */}
-              <div className="mt-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <img
-                  src="/iib-logo.jpg"
-                  alt="O'zbekiston Respublikasi Ichki ishlar vazirligi"
-                  className="w-10 h-10 flex-shrink-0 object-contain mt-0.5"
-                />
-                <p className="text-xs leading-snug text-amber-900 m-0">
-                  <span className="font-semibold">Diqqat!</span> Boshqa shaxsning
-                  telefon raqamini uning roziligisiz kiritish{" "}
-                  <span className="font-semibold">MJtK 183-moddasiga</span> ko&apos;ra
-                  javobgarlikka sabab bo&apos;ladi. Iltimos, faqat o&apos;z
-                  raqamingizni yozing.
-                </p>
-              </div>
             </div>
           )}
 
