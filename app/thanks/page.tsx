@@ -38,6 +38,13 @@ export default function ThanksPage() {
       return true;
     };
 
+    // VK pixel "lead" maqsadi — faqat haqiqiy forma yuborilganda (eventId bor)
+    if (eventId) {
+      const w = window as any;
+      w._tmr = w._tmr || [];
+      w._tmr.push({ type: "reachGoal", id: 3808059, goal: "lead" });
+    }
+
     if (!fireLeadEvent()) {
       const intervalId = setInterval(() => {
         if (fireLeadEvent()) clearInterval(intervalId);
